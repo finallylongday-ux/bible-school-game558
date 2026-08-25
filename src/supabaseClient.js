@@ -1,7 +1,11 @@
-import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { createClient } from "@supabase/supabase-js";
 
-export default defineConfig({
-  plugins: [react()],
-  base: '/bible-school-game/',
-})
+const supabaseUrl = "https://tpqznvpdckashuzydtsf.supabase.co";
+
+const supabaseKey =
+  "sb_publishable_GnkhfLQq4zszSv8T5vAkfA_OY4i0cNa";
+
+export const supabase = createClient(
+  supabaseUrl,
+  supabaseKey
+);
