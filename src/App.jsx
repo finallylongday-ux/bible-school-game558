@@ -440,10 +440,40 @@ function App() {
     if (insertError) {
       console.error("BUY PART ERROR:", insertError);
 
+      // If the server refuses the insert (RLS, permissions) or there's a network error,
+      // fall back to a local-only optimistic purchase so the UI continues to work.
       showNotice(
-        `❌ لم يتم شراء الجزء.
-${insertError.message || "خطأ غير معروف"}`
+        `⚠️ لم يتم تسجيل الشراء على الخادم: ${insertError.message || "خطأ غير معروف"}. تم حفظ الشراء محليًا مؤقتًا.`
       );
+
+      const newTeamPart = {
+        partId: part.id,
+        status: "building",
+        purchasedAt,
+        completedAt: null,
+        dbId: null,
+        _localOnly: true,
+      };
+
+      setTeamParts((previous) => ({
+        ...previous,
+        [loggedTeam.id]: [
+          ...(previous[loggedTeam.id] || []),
+          newTeamPart,
+        ],
+      }));
+
+      setCurrentBuild((previous) => ({
+        ...previous,
+        [loggedTeam.id]: part.id,
+      }));
+
+      setTimeLeft(Math.max(1, Number(part.buildTime || 0) * 60));
+
+      // Deduct balance locally (updateTeam updates local state first).
+      await updateTeam(loggedTeam.id, {
+        balance: balance - price,
+      });
 
       return;
     }
