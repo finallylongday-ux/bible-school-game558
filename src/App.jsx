@@ -6,7 +6,7 @@ const INITIAL_TEAMS = [
   {
     id: 1,
     name: "فريق 1",
-    pin: "1111",
+    pin: "7420",
     balance: 0,
     engineers: 0,
     progress: 0,
@@ -16,7 +16,7 @@ const INITIAL_TEAMS = [
   {
     id: 2,
     name: "فريق 2",
-    pin: "2222",
+    pin: "3691",
     balance: 0,
     engineers: 0,
     progress: 0,
@@ -26,7 +26,7 @@ const INITIAL_TEAMS = [
   {
     id: 3,
     name: "فريق 3",
-    pin: "3333",
+    pin: "5827",
     balance: 0,
     engineers: 0,
     progress: 0,
@@ -36,7 +36,7 @@ const INITIAL_TEAMS = [
   {
     id: 4,
     name: "فريق 4",
-    pin: "4444",
+    pin: "9153",
     balance: 0,
     engineers: 0,
     progress: 0,
@@ -87,6 +87,9 @@ function App() {
 
   const [adminPin, setAdminPin] = useState("");
   const [adminMessage, setAdminMessage] = useState("");
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const [selectedAdminTeamId, setSelectedAdminTeamId] = useState(null);
+  const [activeAdminPage, setActiveAdminPage] = useState("overview");
 
   const [teamParts, setTeamParts] = useState({});
   const [currentBuild, setCurrentBuild] = useState({});
@@ -173,7 +176,7 @@ function App() {
         const part = (partsResult.data || []).find((item) => item.id === building.partId);
         if (!part) return;
         const elapsed = Math.floor((now - building.purchasedAt) / 1000);
-        if (elapsed < part.build_time) {
+        if (elapsed < part.build_time * 60) {
           builds[Number(teamId)] = building.partId;
         }
       });
@@ -189,7 +192,7 @@ function App() {
         );
         if (activeItem && activePart) {
           const elapsed = Math.floor((now - activeItem.purchasedAt) / 1000);
-          setTimeLeft(Math.max(0, activePart.build_time - elapsed));
+          setTimeLeft(Math.max(0, activePart.build_time * 60 - elapsed));
         }
       }
     } catch (error) {
@@ -352,13 +355,24 @@ function App() {
 
     setAdminPin("");
     setAdminMessage("");
+    setIsAdminLoggedIn(true);
+    setActiveAdminPage("overview");
+    setSelectedAdminTeamId(null);
     setPage("admin-dashboard");
   }
 
   function logoutAdmin() {
     setAdminPin("");
     setAdminMessage("");
+    setIsAdminLoggedIn(false);
+    setActiveAdminPage("overview");
+    setSelectedAdminTeamId(null);
     setPage("home");
+  }
+
+  function goAdminPage(nextPage, teamId = null) {
+    setActiveAdminPage(nextPage);
+    setSelectedAdminTeamId(teamId);
   }
 
   function buyEngineer() {
@@ -449,7 +463,7 @@ function App() {
       [loggedTeam.id]: part.id,
     }));
 
-    setTimeLeft(part.buildTime);
+    setTimeLeft(part.buildTime * 60);
 
     updateTeam(loggedTeam.id, {
       balance: loggedTeam.balance - part.price,
@@ -558,6 +572,335 @@ function App() {
     showNotice(
       `🎉 أحسنت! حصلتم على ${station.reward} جنيه.`
     );
+  }
+
+  async function adminAdjustBalance(teamId, amount) {
+    const team = teams.find((item) => item.id === teamId);
+    if (!team) return;
+    const newBalance = Math.max(0, Number(team.balance || 0) + Number(amount || 0));
+    await adminUpdateTeam(teamId, { balance: newBalance });
+  }
+
+  async function adminAdjustEngineers(teamId, delta) {
+    const team = teams.find((item) => item.id === teamId);
+    if (!team) return;
+    const newEngineers = Math.max(0, Number(team.engineers || 0) + Number(delta || 0));
+    await adminUpdateTeam(teamId, { engineers: newEngineers });
+  }
+
+  async function adminUpdateTeam(teamId, changes, message = '') {
+    const team = teams.find((item) => item.id === teamId);
+    if (!team) return false;
+
+    const normalized = { ...changes };
+    if ('completedParts' in normalized) normalized.completed_parts = normalized.completedParts;
+    delete normalized.completedParts;
+
+    const { error } = await supabase.from('teams').update(normalized).eq('id', teamId);
+    if (error) {
+      console.error('Supabase admin team update error:', error);
+      showNotice('⚠️ لم يتم حفظ التعديل في قاعدة البيانات. راجع صلاحيات Supabase RLS.');
+      return false;
+    }
+
+    setTeams((previous) =>
+      previous.map((item) => (item.id === teamId ? { ...item, ...changes } : item))
+    );
+
+    if (message) showNotice(`✅ ${message}`);
+    return true;
+  }
+
+  async function adminSaveTeamSettings(teamId, name, pin) {
+    const cleanName = String(name || '').trim();
+    const cleanPin = String(pin || '').trim();
+    if (!cleanName) {
+      showNotice('❌ اسم الفريق لا يمكن أن يكون فارغًا.');
+      return;
+    }
+    if (!/^\d{4}$/.test(cleanPin)) {
+      showNotice('❌ PIN الفريق يجب أن يكون 4 أرقام.');
+      return;
+    }
+    await adminUpdateTeam(teamId, { name: cleanName, pin: cleanPin }, 'تم حفظ اسم وPIN الفريق.');
+  }
+
+  async function adminSetTeamProgress(teamId, progress) {
+    const value = Math.max(0, Math.min(100, Number(progress) || 0));
+    await adminUpdateTeam(teamId, { progress: value }, 'تم تعديل نسبة البناء.');
+  }
+
+  async function adminSetTeamPartsCount(teamId, completedParts) {
+    const value = Math.max(0, Math.min(parts.length, Number(completedParts) || 0));
+    await adminUpdateTeam(teamId, {
+      completedParts: value,
+      progress: Math.round((value / Math.max(parts.length, 1)) * 100),
+    }, 'تم تعديل عدد أجزاء الخيمة المكتملة.');
+  }
+
+  async function adminMarkPartCompleted(teamId, part) {
+    const team = teams.find((item) => item.id === teamId);
+    if (!team) return;
+
+    const existing = (teamParts[teamId] || []).find((item) => item.partId === part.id);
+
+    if (existing?.status === 'completed') {
+      showNotice('✅ الجزء مكتمل بالفعل.');
+      return;
+    }
+
+    let result;
+    if (existing?.dbId) {
+      result = await supabase
+        .from('team_parts')
+        .update({ status: 'completed', completed_at: new Date().toISOString() })
+        .eq('id', existing.dbId)
+        .select('id')
+        .single();
+    } else {
+      result = await supabase
+        .from('team_parts')
+        .insert({
+          team_id: teamId,
+          part_id: part.id,
+          status: 'completed',
+          purchased_at: new Date().toISOString(),
+          completed_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single();
+    }
+
+    if (result.error) {
+      console.error('Supabase admin part update error:', result.error);
+      showNotice('⚠️ تعذر حفظ حالة الجزء.');
+      return;
+    }
+
+    const currentItems = teamParts[teamId] || [];
+    const nextItems = existing
+      ? currentItems.map((item) =>
+          item.partId === part.id ? { ...item, status: 'completed', completedAt: Date.now() } : item
+        )
+      : [...currentItems, { partId: part.id, status: 'completed', purchasedAt: Date.now(), completedAt: Date.now(), dbId: result.data?.id }];
+
+    setTeamParts((previous) => ({ ...previous, [teamId]: nextItems }));
+
+    const completedCount = nextItems.filter((item) => item.status === 'completed').length;
+    if (currentBuild[teamId] === part.id) {
+      setCurrentBuild((previous) => {
+        const next = { ...previous };
+        delete next[teamId];
+        return next;
+      });
+      if (loggedTeamId === teamId) setTimeLeft(0);
+    }
+
+    await adminUpdateTeam(teamId, {
+      completedParts: completedCount,
+      progress: Math.round((completedCount / Math.max(parts.length, 1)) * 100),
+    }, `تم إنهاء ${part.name} لفريق ${team.name}.`);
+  }
+
+  async function adminResetPart(teamId, part) {
+    const team = teams.find((item) => item.id === teamId);
+    if (!team) return;
+
+    const existing = (teamParts[teamId] || []).find((item) => item.partId === part.id);
+    if (!existing) {
+      showNotice('ℹ️ هذا الجزء غير موجود عند الفريق.');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('team_parts')
+      .delete()
+      .eq('team_id', teamId)
+      .eq('part_id', part.id);
+    if (error) {
+      console.error('Supabase admin part reset error:', error);
+      showNotice('⚠️ تعذر إلغاء الجزء.');
+      return;
+    }
+
+    const nextItems = (teamParts[teamId] || []).filter((item) => item.partId !== part.id);
+    setTeamParts((previous) => ({ ...previous, [teamId]: nextItems }));
+
+    if (currentBuild[teamId] === part.id) {
+      setCurrentBuild((previous) => {
+        const next = { ...previous };
+        delete next[teamId];
+        return next;
+      });
+      if (loggedTeamId === teamId) setTimeLeft(0);
+    }
+
+    const completedCount = nextItems.filter((item) => item.status === 'completed').length;
+    await adminUpdateTeam(teamId, {
+      completedParts: completedCount,
+      progress: Math.round((completedCount / Math.max(parts.length, 1)) * 100),
+    }, `تم إلغاء ${part.name} لفريق ${team.name}.`);
+  }
+
+  async function adminToggleStation(teamId, station) {
+    const team = teams.find((item) => item.id === teamId);
+    if (!team) return;
+
+    const completedList = teamStationResults[teamId] || [];
+    const alreadyCompleted = completedList.includes(station.id);
+
+    if (alreadyCompleted) {
+      const { error } = await supabase
+        .from('team_stations')
+        .delete()
+        .eq('team_id', teamId)
+        .eq('station_id', station.id);
+
+      if (error) {
+        console.error('Supabase admin station remove error:', error);
+        showNotice('⚠️ تعذر إلغاء المحطة.');
+        return;
+      }
+
+      const nextStations = completedList.filter((id) => id !== station.id);
+      setTeamStationResults((previous) => ({ ...previous, [teamId]: nextStations }));
+      await adminUpdateTeam(teamId, {
+        balance: Math.max(0, Number(team.balance || 0) - Number(station.reward || 0)),
+        stations: nextStations.length,
+      }, `تم إلغاء ${station.name} لفريق ${team.name}.`);
+    } else {
+      const { error } = await supabase.from('team_stations').insert({
+        team_id: teamId,
+        station_id: station.id,
+      });
+
+      if (error) {
+        console.error('Supabase admin station add error:', error);
+        showNotice('⚠️ تعذر حفظ المحطة.');
+        return;
+      }
+
+      const nextStations = [...completedList, station.id];
+      setTeamStationResults((previous) => ({ ...previous, [teamId]: nextStations }));
+      await adminUpdateTeam(teamId, {
+        balance: Number(team.balance || 0) + Number(station.reward || 0),
+        stations: nextStations.length,
+      }, `تم إنهاء ${station.name} لفريق ${team.name}.`);
+    }
+  }
+
+  async function adminCompleteAllParts(teamId) {
+    for (const part of parts) {
+      const existing = (teamParts[teamId] || []).find((item) => item.partId === part.id);
+      if (existing?.status === 'completed') continue;
+      const { error } = existing?.dbId
+        ? await supabase.from('team_parts').update({ status: 'completed', completed_at: new Date().toISOString() }).eq('id', existing.dbId)
+        : await supabase.from('team_parts').insert({ team_id: teamId, part_id: part.id, status: 'completed', purchased_at: new Date().toISOString(), completed_at: new Date().toISOString() });
+      if (error) {
+        console.error(error);
+        showNotice('⚠️ توقف تعميم الأجزاء بسبب خطأ في قاعدة البيانات.');
+        return;
+      }
+    }
+    await loadGameData();
+    await adminUpdateTeam(teamId, { completedParts: parts.length, progress: 100 }, 'تم إنهاء كل أجزاء الخيمة.');
+  }
+
+  async function adminClearAllParts(teamId) {
+    const { error } = await supabase.from('team_parts').delete().eq('team_id', teamId);
+    if (error) {
+      console.error(error);
+      showNotice('⚠️ تعذر تصفير أجزاء الفريق.');
+      return;
+    }
+    setTeamParts((previous) => ({ ...previous, [teamId]: [] }));
+    setCurrentBuild((previous) => {
+      const next = { ...previous };
+      delete next[teamId];
+      return next;
+    });
+    if (loggedTeamId === teamId) setTimeLeft(0);
+    await adminUpdateTeam(teamId, { completedParts: 0, progress: 0 }, 'تم تصفير أجزاء الخيمة.');
+  }
+
+  async function adminCompleteAllStations(teamId) {
+    const existing = new Set(teamStationResults[teamId] || []);
+    const missing = stations.filter((station) => !existing.has(station.id));
+    for (const station of missing) {
+      const { error } = await supabase.from('team_stations').insert({ team_id: teamId, station_id: station.id });
+      if (error) {
+        console.error(error);
+        showNotice('⚠️ تعذر إنهاء كل المحطات.');
+        return;
+      }
+    }
+    const totalReward = missing.reduce((sum, station) => sum + Number(station.reward || 0), 0);
+    const nextStations = stations.map((station) => station.id);
+    setTeamStationResults((previous) => ({ ...previous, [teamId]: nextStations }));
+    const team = teams.find((item) => item.id === teamId);
+    await adminUpdateTeam(teamId, {
+      stations: nextStations.length,
+      balance: Number(team?.balance || 0) + totalReward,
+    }, 'تم إنهاء كل المحطات.');
+  }
+
+  async function adminClearAllStations(teamId) {
+    const completed = teamStationResults[teamId] || [];
+    if (!completed.length) {
+      showNotice('ℹ️ لا توجد محطات مكتملة لهذا الفريق.');
+      return;
+    }
+    const { error } = await supabase.from('team_stations').delete().eq('team_id', teamId);
+    if (error) {
+      console.error(error);
+      showNotice('⚠️ تعذر تصفير المحطات.');
+      return;
+    }
+    const refund = completed.reduce((sum, id) => {
+      const station = stations.find((item) => item.id === id);
+      return sum + Number(station?.reward || 0);
+    }, 0);
+    const team = teams.find((item) => item.id === teamId);
+    setTeamStationResults((previous) => ({ ...previous, [teamId]: [] }));
+    await adminUpdateTeam(teamId, {
+      stations: 0,
+      balance: Math.max(0, Number(team?.balance || 0) - refund),
+    }, 'تم تصفير المحطات وإرجاع مكافآتها من الرصيد.');
+  }
+
+  async function adminResetTeam(teamId) {
+    const team = teams.find((item) => item.id === teamId);
+    if (!team) return;
+    const confirmed = window.confirm(`متأكد إنك عايز تصفر كل بيانات ${team.name}؟\nسيتم حذف الأجزاء والمحطات وإرجاع الرصيد والمهندسين والتقدم للصفر.`);
+    if (!confirmed) return;
+
+    const [partsDelete, stationsDelete] = await Promise.all([
+      supabase.from('team_parts').delete().eq('team_id', teamId),
+      supabase.from('team_stations').delete().eq('team_id', teamId),
+    ]);
+    if (partsDelete.error || stationsDelete.error) {
+      console.error(partsDelete.error || stationsDelete.error);
+      showNotice('⚠️ تعذر تصفير الفريق بالكامل.');
+      return;
+    }
+
+    const ok = await adminUpdateTeam(teamId, {
+      balance: 0,
+      engineers: 0,
+      progress: 0,
+      completedParts: 0,
+      stations: 0,
+    }, `تم تصفير ${team.name} بالكامل.`);
+    if (!ok) return;
+
+    setTeamParts((previous) => ({ ...previous, [teamId]: [] }));
+    setTeamStationResults((previous) => ({ ...previous, [teamId]: [] }));
+    setCurrentBuild((previous) => {
+      const next = { ...previous };
+      delete next[teamId];
+      return next;
+    });
+    if (loggedTeamId === teamId) setTimeLeft(0);
   }
 
   function formatTime(seconds) {
@@ -673,10 +1016,6 @@ function App() {
             >
               دخول لوحة التحكم 👑
             </button>
-
-            <div className="login-hint">
-              💡 الرقم التجريبي حاليًا: 9999
-            </div>
 
           </div>
 
@@ -798,18 +1137,6 @@ function App() {
             >
               ابدأ المغامرة 🏕️
             </button>
-
-            <div className="login-hint">
-              💡 للتجربة:
-              <br />
-              فريق 1 → 1111
-              <br />
-              فريق 2 → 2222
-              <br />
-              فريق 3 → 3333
-              <br />
-              فريق 4 → 4444
-            </div>
 
           </div>
 
@@ -1064,7 +1391,7 @@ function App() {
                             </span>
 
                             <span>
-                              ⏱️ {part.buildTime} ثانية
+                              ⏱️ {part.buildTime} دقيقة
                             </span>
                           </div>
 
@@ -1295,237 +1622,205 @@ function App() {
      ADMIN DASHBOARD
   ========================= */
 
-  if (page === "admin-dashboard") {
-    const totalBalance = teams.reduce(
-      (sum, team) => sum + team.balance,
-      0
-    );
-
-    const averageProgress =
-      teams.length > 0
-        ? Math.round(
-            teams.reduce(
-              (sum, team) => sum + team.progress,
-              0
-            ) / teams.length
-          )
-        : 0;
-
-    const totalStations = teams.reduce(
-      (sum, team) => sum + team.stations,
-      0
-    );
+  if (page === 'admin-dashboard' && isAdminLoggedIn) {
+    const totalBalance = teams.reduce((sum, team) => sum + Number(team.balance || 0), 0);
+    const averageProgress = teams.length
+      ? Math.round(teams.reduce((sum, team) => sum + Number(team.progress || 0), 0) / teams.length)
+      : 0;
+    const totalStations = teams.reduce((sum, team) => sum + Number(team.stations || 0), 0);
+    const totalCompletedParts = teams.reduce((sum, team) => sum + Number(team.completedParts || 0), 0);
+    const selectedAdminTeam = teams.find((team) => team.id === selectedAdminTeamId);
+    const selectedTeamParts = selectedAdminTeamId ? teamParts[selectedAdminTeamId] || [] : [];
+    const selectedTeamStationResults = selectedAdminTeamId ? teamStationResults[selectedAdminTeamId] || [] : [];
 
     return (
-      <div className="admin-dashboard">
-
-        <header className="admin-topbar">
-
+      <div className='admin-dashboard'>
+        <header className='admin-topbar'>
           <div>
-            <div className="admin-small-title">
-              BIBLE SCHOOL ADVENTURE
-            </div>
-
-            <h1>
-              👑 لوحة تحكم الأدمن
-            </h1>
+            <div className='admin-small-title'>BIBLE SCHOOL ADVENTURE</div>
+            <h1>👑 لوحة تحكم الأدمن</h1>
           </div>
-
-          <button
-            className="logout-button"
-            onClick={logoutAdmin}
-          >
-            تسجيل الخروج
-          </button>
-
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button className='back-button' onClick={() => loadGameData()}>🔄 تحديث البيانات</button>
+            <button className='logout-button' onClick={logoutAdmin}>تسجيل الخروج</button>
+          </div>
         </header>
 
-        <main className="admin-content">
+        <main className='admin-content'>
+          {activeAdminPage === 'overview' && (
+            <>
+              <section className='admin-welcome'>
+                <div className='admin-welcome-icon'>👑</div>
+                <div>
+                  <h2>مركز التحكم الكامل</h2>
+                  <p>من هنا تقدر تتحكم في الفرق، الرصيد، المهندسين، الأجزاء، المحطات، التقدم، الاسم وPIN، أو تصفر الفريق بالكامل.</p>
+                </div>
+              </section>
 
-          <section className="admin-welcome">
+              <section className='admin-overview'>
+                <div className='admin-overview-card'><span>👥</span><small>عدد الفرق</small><strong>{teams.length}</strong></div>
+                <div className='admin-overview-card'><span>💰</span><small>إجمالي الأموال</small><strong>{totalBalance} جنيه</strong></div>
+                <div className='admin-overview-card'><span>🏕️</span><small>متوسط البناء</small><strong>{averageProgress}%</strong></div>
+                <div className='admin-overview-card'><span>🧱</span><small>الأجزاء المكتملة</small><strong>{totalCompletedParts} / {teams.length * parts.length}</strong></div>
+                <div className='admin-overview-card'><span>🗺️</span><small>المحطات المكتملة</small><strong>{totalStations} / {teams.length * stations.length}</strong></div>
+              </section>
 
-            <div className="admin-welcome-icon">
-              👑
-            </div>
+              <section className='admin-section'>
+                <div className='admin-section-header'>
+                  <div>
+                    <h2>👥 الفرق</h2>
+                    <p>اضغط على أي فريق لفتح لوحة تحكم كاملة لكل بياناته.</p>
+                  </div>
+                </div>
 
-            <div>
-              <h2>
-                مركز التحكم الرئيسي
-              </h2>
+                <div className='admin-team-grid'>
+                  {sortedTeams.map((team, index) => (
+                    <div className='admin-team-card' key={team.id} onClick={() => goAdminPage('team-detail', team.id)} style={{ cursor: 'pointer' }}>
+                      <div className='admin-team-header'>
+                        <div className='team-number'>{index + 1}</div>
+                        <div><h3>{team.name}</h3><small>PIN: {team.pin}</small></div>
+                      </div>
+                      <div className='admin-team-info'>
+                        <div><span>💰 الرصيد</span><strong>{team.balance} جنيه</strong></div>
+                        <div><span>👷 المهندسين</span><strong>{team.engineers}</strong></div>
+                        <div><span>🏕️ البناء</span><strong>{team.progress}%</strong></div>
+                        <div><span>🧱 الأجزاء</span><strong>{team.completedParts}/{parts.length}</strong></div>
+                        <div><span>🗺️ المحطات</span><strong>{team.stations}/{stations.length}</strong></div>
+                      </div>
+                      <div className='admin-team-progress'>
+                        <div className='admin-progress-track'><div className='admin-progress-fill' style={{ width: `${team.progress}%` }} /></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </>
+          )}
 
-              <p>
-                من هنا تقدر تتابع حالة كل الفرق.
-              </p>
-            </div>
+          {activeAdminPage === 'team-detail' && selectedAdminTeam && (
+            <section className='team-subpage'>
+              <button className='back-button' onClick={() => goAdminPage('overview')}>← رجوع لكل الفرق</button>
 
-          </section>
-
-          <section className="admin-overview">
-
-            <div className="admin-overview-card">
-              <span>👥</span>
-              <small>عدد الفرق</small>
-              <strong>{teams.length}</strong>
-            </div>
-
-            <div className="admin-overview-card">
-              <span>💰</span>
-              <small>إجمالي الأموال</small>
-              <strong>{totalBalance} جنيه</strong>
-            </div>
-
-            <div className="admin-overview-card">
-              <span>🏕️</span>
-              <small>متوسط البناء</small>
-              <strong>{averageProgress}%</strong>
-            </div>
-
-            <div className="admin-overview-card">
-              <span>🗺️</span>
-              <small>المحطات المكتملة</small>
-              <strong>{totalStations} / 28</strong>
-            </div>
-
-          </section>
-
-          <section className="admin-section">
-
-            <div className="admin-section-header">
-
-              <div>
-                <h2>👥 الفرق</h2>
-
-                <p>
-                  نظرة سريعة على حالة كل فريق
-                </p>
+              <div className='subpage-header'>
+                <div>
+                  <h2>👑 إدارة {selectedAdminTeam.name}</h2>
+                  <p>تحكم كامل في كل بيانات الفريق.</p>
+                </div>
+                <div className='subpage-balance'>💰 {selectedAdminTeam.balance} جنيه</div>
               </div>
 
-            </div>
+              <section className='dashboard-stats'>
+                <div className='dashboard-stat'><div>💰</div><span>الرصيد</span><strong>{selectedAdminTeam.balance} جنيه</strong></div>
+                <div className='dashboard-stat'><div>🏕️</div><span>البناء</span><strong>{selectedAdminTeam.progress}%</strong></div>
+                <div className='dashboard-stat'><div>👷</div><span>المهندسين</span><strong>{selectedAdminTeam.engineers}</strong></div>
+                <div className='dashboard-stat'><div>🧱</div><span>الأجزاء</span><strong>{selectedAdminTeam.completedParts}/{parts.length}</strong></div>
+                <div className='dashboard-stat'><div>🗺️</div><span>المحطات</span><strong>{selectedAdminTeam.stations}/{stations.length}</strong></div>
+              </section>
 
-            <div className="admin-team-grid">
-
-              {sortedTeams.map((team, index) => (
-                <div
-                  className="admin-team-card"
-                  key={team.id}
-                >
-
-                  <div className="admin-team-header">
-
-                    <div className="team-number">
-                      {index + 1}
-                    </div>
-
-                    <div>
-                      <h3>{team.name}</h3>
-
-                      <span>
-                        PIN: {team.pin}
-                      </span>
-                    </div>
-
-                  </div>
-
-                  <div className="admin-team-info">
-
-                    <div>
-                      <span>💰 الرصيد</span>
-                      <strong>
-                        {team.balance} جنيه
-                      </strong>
-                    </div>
-
-                    <div>
-                      <span>👷 المهندسين</span>
-                      <strong>
-                        {team.engineers}
-                      </strong>
-                    </div>
-
-                    <div>
-                      <span>🏕️ البناء</span>
-                      <strong>
-                        {team.progress}%
-                      </strong>
-                    </div>
-
-                    <div>
-                      <span>🗺️ المحطات</span>
-                      <strong>
-                        {team.stations} / 7
-                      </strong>
-                    </div>
-
-                  </div>
-
-                  <div className="admin-team-progress">
-
-                    <div className="admin-progress-track">
-
-                      <div
-                        className="admin-progress-fill"
-                        style={{
-                          width: `${team.progress}%`,
-                        }}
-                      />
-
-                    </div>
-
-                  </div>
-
+              <div className='engineer-main-card'>
+                <h2>⚙️ بيانات الفريق الأساسية</h2>
+                <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', marginTop: 15 }}>
+                  <label>اسم الفريق<input className='team-select' defaultValue={selectedAdminTeam.name} id={`admin-name-${selectedAdminTeam.id}`} /></label>
+                  <label>PIN الفريق<input className='pin-input' defaultValue={selectedAdminTeam.pin} maxLength={4} inputMode='numeric' id={`admin-pin-${selectedAdminTeam.id}`} /></label>
                 </div>
-              ))}
+                <div className='admin-tools' style={{ marginTop: 12 }}>
+                  <button className='admin-tool-card' onClick={() => adminSaveTeamSettings(selectedAdminTeam.id, document.getElementById(`admin-name-${selectedAdminTeam.id}`)?.value, document.getElementById(`admin-pin-${selectedAdminTeam.id}`)?.value)}>💾 حفظ البيانات</button>
+                </div>
+              </div>
 
-            </div>
+              <div className='engineer-main-card'>
+                <h2>💰 التحكم في الرصيد</h2>
+                <div className='admin-tools' style={{ marginTop: 12 }}>
+                  {[100, 500, 1000].map((amount) => <button key={`plus-${amount}`} className='admin-tool-card' onClick={() => adminAdjustBalance(selectedAdminTeam.id, amount)}>➕ +{amount} جنيه</button>)}
+                  {[100, 500, 1000].map((amount) => <button key={`minus-${amount}`} className='admin-tool-card' onClick={() => adminAdjustBalance(selectedAdminTeam.id, -amount)}>➖ -{amount} جنيه</button>)}
+                  <button className='admin-tool-card' onClick={() => adminUpdateTeam(selectedAdminTeam.id, { balance: 0 }, 'تم تصفير الرصيد.')}>🧹 تصفير الرصيد</button>
+                </div>
+              </div>
 
-          </section>
+              <div className='engineer-main-card'>
+                <h2>👷 التحكم في المهندسين</h2>
+                <strong className='engineer-count'>{selectedAdminTeam.engineers}</strong>
+                <div className='admin-tools' style={{ marginTop: 12 }}>
+                  <button className='admin-tool-card' onClick={() => adminAdjustEngineers(selectedAdminTeam.id, 1)}>➕ إضافة مهندس</button>
+                  <button className='admin-tool-card' onClick={() => adminAdjustEngineers(selectedAdminTeam.id, -1)}>➖ إنقاص مهندس</button>
+                  <button className='admin-tool-card' onClick={() => adminUpdateTeam(selectedAdminTeam.id, { engineers: 0 }, 'تم تصفير المهندسين.')}>🧹 تصفير المهندسين</button>
+                </div>
+              </div>
 
-          <section className="admin-tools">
+              <div className='engineer-main-card'>
+                <h2>🏕️ التحكم في التقدم</h2>
+                <div className='admin-tools' style={{ marginTop: 12 }}>
+                  {[0, 25, 50, 75, 100].map((value) => <button key={value} className='admin-tool-card' onClick={() => adminSetTeamProgress(selectedAdminTeam.id, value)}>{value}%</button>)}
+                </div>
+                <div style={{ marginTop: 15 }}>
+                  <input type='range' min='0' max='100' value={selectedAdminTeam.progress} onChange={(e) => adminSetTeamProgress(selectedAdminTeam.id, e.target.value)} style={{ width: '100%' }} />
+                </div>
+              </div>
 
-            <button className="admin-tool-card">
-              <span>💰</span>
-              <strong>إدارة الأموال</strong>
-              <small>سنضيفها في المرحلة القادمة</small>
-            </button>
+              <div className='engineer-main-card'>
+                <h2>🧱 تحكم سريع في أجزاء الخيمة</h2>
+                <div className='admin-tools' style={{ marginTop: 12 }}>
+                  <button className='admin-tool-card' onClick={() => adminCompleteAllParts(selectedAdminTeam.id)}>✅ إنهاء كل الأجزاء</button>
+                  <button className='admin-tool-card' onClick={() => adminClearAllParts(selectedAdminTeam.id)}>↩️ تصفير كل الأجزاء</button>
+                  <button className='admin-tool-card' onClick={() => adminSetTeamPartsCount(selectedAdminTeam.id, 0)}>0 أجزاء</button>
+                  <button className='admin-tool-card' onClick={() => adminSetTeamPartsCount(selectedAdminTeam.id, parts.length)}>13 أجزاء</button>
+                </div>
+              </div>
 
-            <button className="admin-tool-card">
-              <span>🏕️</span>
-              <strong>أجزاء الخيمة</strong>
-              <small>
-                {parts.length} جزء جاهز
-              </small>
-            </button>
+              <div className='subpage-header'><div><h2>🏕️ أجزاء الخيمة</h2><p>تحكم في كل جزء بشكل منفصل.</p></div></div>
+              <div className='parts-grid'>
+                {parts.map((part) => {
+                  const owned = selectedTeamParts.find((item) => item.partId === part.id);
+                  const status = owned?.status;
+                  return (
+                    <div className={`part-card ${status === 'completed' ? 'part-completed' : ''}`} key={part.id}>
+                      <div className='part-icon'>{part.icon}</div>
+                      <div className='part-number'>الجزء {part.id}</div>
+                      <h3>{part.name}</h3>
+                      <div className='part-details'><span>💰 {part.price} جنيه</span><span>⏱️ {part.buildTime} دقيقة</span></div>
+                      <div>{status === 'completed' ? '✅ مكتمل' : status === 'building' ? '🔨 قيد البناء' : '⬜ غير مشترى'}</div>
+                      <div className='admin-tools' style={{ marginTop: 8 }}>
+                        <button className='admin-tool-card' onClick={() => adminMarkPartCompleted(selectedAdminTeam.id, part)} disabled={status === 'completed'}>✅ إنهاء</button>
+                        <button className='admin-tool-card' onClick={() => adminResetPart(selectedAdminTeam.id, part)} disabled={!owned}>↩️ إلغاء</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
 
-            <button className="admin-tool-card">
-              <span>🗺️</span>
-              <strong>المحطات</strong>
-              <small>
-                {stations.length} محطات
-              </small>
-            </button>
+              <div className='engineer-main-card'>
+                <h2>🗺️ تحكم سريع في المحطات</h2>
+                <div className='admin-tools' style={{ marginTop: 12 }}>
+                  <button className='admin-tool-card' onClick={() => adminCompleteAllStations(selectedAdminTeam.id)}>✅ إنهاء كل المحطات</button>
+                  <button className='admin-tool-card' onClick={() => adminClearAllStations(selectedAdminTeam.id)}>↩️ تصفير المحطات</button>
+                </div>
+              </div>
 
-            <button className="admin-tool-card">
-              <span>👷</span>
-              <strong>المهندسين</strong>
-              <small>إدارة المهندسين</small>
-            </button>
+              <div className='subpage-header'><div><h2>🗺️ المحطات</h2><p>تعليم أو إلغاء أي محطة مع تحديث الرصيد تلقائيًا.</p></div></div>
+              <div className='stations-grid'>
+                {stations.map((station) => {
+                  const completed = selectedTeamStationResults.includes(station.id);
+                  return (
+                    <div className={`station-card ${completed ? 'station-completed' : ''}`} key={station.id}>
+                      <div className='station-icon'>{station.icon}</div>
+                      <div className='station-number'>محطة {station.id}</div>
+                      <h3>{station.name}</h3>
+                      <div className='station-reward'>💰 المكافأة: {station.reward} جنيه</div>
+                      <button className='station-button' onClick={() => adminToggleStation(selectedAdminTeam.id, station)}>{completed ? '↩️ إلغاء الإنجاز' : '✅ تعليم كمنجزة'}</button>
+                    </div>
+                  );
+                })}
+              </div>
 
-            <button className="admin-tool-card">
-              <span>🏆</span>
-              <strong>الترتيب</strong>
-              <small>الترتيب حسب التقدم</small>
-            </button>
-
-            <button className="admin-tool-card">
-              <span>📜</span>
-              <strong>السجل</strong>
-              <small>سنضيفه مع Supabase</small>
-            </button>
-
-          </section>
-
+              <div className='engineer-main-card' style={{ border: '2px solid #b91c1c' }}>
+                <h2>⚠️ منطقة الخطر</h2>
+                <p>هذا الزر يمسح كل أجزاء ومحطات الفريق ويعيد الرصيد والمهندسين والتقدم للصفر.</p>
+                <button className='logout-button' onClick={() => adminResetTeam(selectedAdminTeam.id)}>🗑️ تصفير الفريق بالكامل</button>
+              </div>
+            </section>
+          )}
         </main>
-
+        {notice && <div className='game-notice'>{notice}</div>}
       </div>
     );
   }
@@ -1627,7 +1922,9 @@ function App() {
 
           <button
             className="admin-button"
-            onClick={() => setPage("admin-login")}
+            onClick={() =>
+              setPage(isAdminLoggedIn ? "admin-dashboard" : "admin-login")
+            }
           >
             👑
             <span>لوحة الأدمن</span>
