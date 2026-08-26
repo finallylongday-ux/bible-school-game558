@@ -109,3 +109,577 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+/* =========================================================
+   🏕️ TENT PARTS - ORGANIZED DESIGN
+   ========================================================= */
+
+/* عنوان قسم أجزاء الخيمة */
+.parts-section {
+  width: 100%;
+  margin-top: 25px;
+}
+
+.parts-section h2 {
+  margin-bottom: 18px;
+  font-size: 26px;
+  font-weight: 900;
+  color: #172033;
+}
+
+/* =========================================================
+   GRID
+   ========================================================= */
+
+.parts-grid {
+  width: 100%;
+
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+
+  gap: 22px;
+
+  margin-top: 20px;
+}
+
+/* =========================================================
+   PART CARD
+   ========================================================= */
+
+.part-card {
+  position: relative;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+
+  min-width: 0;
+  min-height: 390px;
+
+  padding: 25px 20px 20px;
+
+  background: #ffffff;
+
+  border: 1px solid #e5e7eb;
+  border-radius: 22px;
+
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.06);
+
+  overflow: hidden;
+
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+}
+
+/* الشريط اللي فوق الكارت */
+.part-card::before {
+  content: "";
+
+  position: absolute;
+
+  top: 0;
+  left: 0;
+  right: 0;
+
+  height: 5px;
+
+  background: linear-gradient(
+    90deg,
+    #2563eb,
+    #38bdf8
+  );
+}
+
+.part-card:hover {
+  transform: translateY(-5px);
+
+  border-color: #bfdbfe;
+
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.10);
+}
+
+/* =========================================================
+   PART ICON
+   ========================================================= */
+
+.part-icon {
+  width: 100px;
+  height: 100px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  margin: 5px auto 15px;
+
+  font-size: 52px;
+
+  background: linear-gradient(
+    145deg,
+    #eff6ff,
+    #dbeafe
+  );
+
+  border: 1px solid #dbeafe;
+
+  border-radius: 26px;
+
+  box-shadow:
+    0 8px 20px rgba(37, 99, 235, 0.08);
+
+  flex-shrink: 0;
+}
+
+/* =========================================================
+   PART NUMBER
+   ========================================================= */
+
+.part-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 5px 13px;
+
+  margin-bottom: 9px;
+
+  color: #2563eb;
+
+  background: #eff6ff;
+
+  border: 1px solid #dbeafe;
+
+  border-radius: 999px;
+
+  font-size: 12px;
+  font-weight: 900;
+}
+
+/* =========================================================
+   PART TITLE
+   ========================================================= */
+
+.part-card h3 {
+  width: 100%;
+
+  margin: 3px 0 17px;
+
+  text-align: center;
+
+  color: #172033;
+
+  font-size: 20px;
+  font-weight: 900;
+
+  line-height: 1.35;
+}
+
+/* =========================================================
+   PART DETAILS
+   ========================================================= */
+
+.part-details {
+  width: 100%;
+
+  display: grid;
+
+  grid-template-columns: 1fr 1fr;
+
+  gap: 10px;
+
+  margin-bottom: 20px;
+}
+
+.part-details span {
+  min-height: 58px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  padding: 8px;
+
+  text-align: center;
+
+  color: #475569;
+
+  background: #f8fafc;
+
+  border: 1px solid #e5e7eb;
+
+  border-radius: 14px;
+
+  font-size: 12px;
+  font-weight: 800;
+
+  line-height: 1.4;
+}
+
+/* السعر */
+.part-details span:first-child {
+  color: #047857;
+
+  background: #ecfdf5;
+
+  border-color: #a7f3d0;
+}
+
+/* وقت البناء */
+.part-details span:last-child {
+  color: #7c3aed;
+
+  background: #f5f3ff;
+
+  border-color: #ddd6fe;
+}
+
+/* =========================================================
+   BUY BUTTON
+   ========================================================= */
+
+.buy-button {
+  width: 100%;
+
+  min-height: 52px;
+
+  margin-top: auto;
+
+  border: none;
+  border-radius: 14px;
+
+  color: #ffffff;
+
+  background: linear-gradient(
+    135deg,
+    #2563eb,
+    #1d4ed8
+  );
+
+  font-family: inherit;
+
+  font-size: 15px;
+  font-weight: 900;
+
+  cursor: pointer;
+
+  box-shadow:
+    0 7px 18px rgba(37, 99, 235, 0.22);
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.buy-button:hover {
+  transform: translateY(-2px);
+
+  box-shadow:
+    0 11px 24px rgba(37, 99, 235, 0.30);
+}
+
+.buy-button:active {
+  transform: translateY(0);
+}
+
+.buy-button:disabled {
+  opacity: 0.5;
+
+  cursor: not-allowed;
+
+  transform: none;
+
+  box-shadow: none;
+}
+
+/* =========================================================
+   BUILDING STATE
+   ========================================================= */
+
+.building-button {
+  width: 100%;
+
+  min-height: 52px;
+
+  margin-top: auto;
+
+  border-radius: 14px;
+
+  color: #92400e;
+
+  background: linear-gradient(
+    135deg,
+    #fef3c7,
+    #fde68a
+  );
+
+  border: 1px solid #fcd34d;
+
+  font-family: inherit;
+
+  font-size: 15px;
+  font-weight: 900;
+
+  cursor: default;
+
+  animation: tentBuildingPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes tentBuildingPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(245, 158, 11, 0);
+  }
+
+  50% {
+    box-shadow:
+      0 0 20px rgba(245, 158, 11, 0.20);
+  }
+}
+
+/* =========================================================
+   COMPLETED STATE
+   ========================================================= */
+
+.part-completed {
+  background: linear-gradient(
+    145deg,
+    #f0fdf4,
+    #ffffff
+  );
+
+  border-color: #bbf7d0;
+}
+
+.part-completed::before {
+  background: linear-gradient(
+    90deg,
+    #10b981,
+    #059669
+  );
+}
+
+.part-completed .part-icon {
+  background: linear-gradient(
+    145deg,
+    #dcfce7,
+    #bbf7d0
+  );
+
+  border-color: #bbf7d0;
+}
+
+.part-completed .part-number {
+  color: #047857;
+
+  background: #d1fae5;
+
+  border-color: #a7f3d0;
+}
+
+.completed-button {
+  width: 100%;
+
+  min-height: 52px;
+
+  margin-top: auto;
+
+  border-radius: 14px;
+
+  color: #047857;
+
+  background: linear-gradient(
+    135deg,
+    #d1fae5,
+    #a7f3d0
+  );
+
+  border: 1px solid #86efac;
+
+  font-family: inherit;
+
+  font-size: 15px;
+  font-weight: 900;
+
+  cursor: default;
+}
+
+/* =========================================================
+   ACTIVE BUILDING CARD
+   ========================================================= */
+
+.active-build-card {
+  width: 100%;
+
+  display: grid;
+
+  grid-template-columns:
+    auto 1fr auto;
+
+  align-items: center;
+
+  gap: 18px;
+
+  margin: 20px 0 25px;
+
+  padding: 18px 22px;
+
+  background: linear-gradient(
+    135deg,
+    #fff7ed,
+    #ffedd5
+  );
+
+  border: 1px solid #fed7aa;
+
+  border-radius: 20px;
+
+  box-shadow:
+    0 8px 25px rgba(234, 88, 12, 0.08);
+}
+
+.active-build-card > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 8px 13px;
+
+  color: #c2410c;
+
+  background: #ffedd5;
+
+  border: 1px solid #fed7aa;
+
+  border-radius: 999px;
+
+  font-size: 12px;
+  font-weight: 900;
+
+  white-space: nowrap;
+}
+
+.active-build-card > strong {
+  color: #7c2d12;
+
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.active-build-card > div {
+  min-width: 110px;
+
+  padding: 10px 15px;
+
+  text-align: center;
+
+  color: #92400e;
+
+  background: #ffffff;
+
+  border: 1px solid #fed7aa;
+
+  border-radius: 12px;
+
+  font-size: 14px;
+  font-weight: 900;
+}
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 1050px) {
+  .parts-grid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+
+    gap: 18px;
+  }
+}
+
+@media (max-width: 650px) {
+  .parts-grid {
+    grid-template-columns: 1fr;
+
+    gap: 16px;
+  }
+
+  .part-card {
+    min-height: 360px;
+
+    padding: 22px 18px 18px;
+
+    border-radius: 20px;
+  }
+
+  .part-icon {
+    width: 90px;
+    height: 90px;
+
+    font-size: 46px;
+
+    border-radius: 23px;
+  }
+
+  .part-card h3 {
+    font-size: 19px;
+  }
+
+  .part-details {
+    gap: 8px;
+  }
+
+  .active-build-card {
+    grid-template-columns: 1fr;
+
+    text-align: center;
+
+    gap: 10px;
+
+    padding: 16px;
+  }
+
+  .active-build-card > span {
+    justify-self: center;
+  }
+
+  .active-build-card > div {
+    width: 100%;
+  }
+}
+
+@media (max-width: 400px) {
+  .part-card {
+    min-height: 340px;
+
+    padding: 20px 15px 16px;
+  }
+
+  .part-icon {
+    width: 82px;
+    height: 82px;
+
+    font-size: 42px;
+  }
+
+  .part-card h3 {
+    font-size: 18px;
+  }
+
+  .part-details span {
+    font-size: 11px;
+  }
+
+  .buy-button,
+  .building-button,
+  .completed-button {
+    min-height: 48px;
+
+    font-size: 14px;
+  }
+}
