@@ -273,14 +273,6 @@ function App() {
   }
 
   async function updateTeam(teamId, changes) {
-    setTeams((previousTeams) =>
-      previousTeams.map((team) =>
-        team.id === teamId
-          ? { ...team, ...changes }
-          : team
-      )
-    );
-
     const dbChanges = { ...changes };
     if ("completedParts" in dbChanges) {
       dbChanges.completed_parts = dbChanges.completedParts;
@@ -295,7 +287,18 @@ function App() {
     if (error) {
       console.error("Supabase team update error:", error);
       showNotice("⚠️ حدث خطأ أثناء حفظ بيانات الفريق.");
+      return { error };
     }
+
+    setTeams((previousTeams) =>
+      previousTeams.map((team) =>
+        team.id === teamId
+          ? { ...team, ...changes }
+          : team
+      )
+    );
+
+    return { error };
   }
 
   function handleTeamLogin() {
@@ -375,7 +378,7 @@ function App() {
     setSelectedAdminTeamId(teamId);
   }
 
-  function buyEngineer() {
+  async function buyEngineer() {
     if (!loggedTeam) return;
 
     const price = 500;
@@ -385,10 +388,12 @@ function App() {
       return;
     }
 
-    updateTeam(loggedTeam.id, {
+    const { error } = await updateTeam(loggedTeam.id, {
       balance: loggedTeam.balance - price,
       engineers: loggedTeam.engineers + 1,
     });
+
+    if (error) return;
 
     showNotice("👷 تم شراء مهندس جديد بنجاح!");
   }
@@ -456,6 +461,22 @@ ${insertError.message || "خطأ غير معروف"}`
       dbId: null,
     };
 
+    const { error: balanceError } = await updateTeam(loggedTeam.id, {
+      balance: balance - price,
+    });
+
+    if (balanceError) {
+      console.error("BALANCE UPDATE ERROR:", balanceError);
+      await supabase
+        .from("team_parts")
+        .delete()
+        .eq("team_id", loggedTeam.id)
+        .eq("part_id", part.id)
+        .eq("status", "building");
+      showNotice("⚠️ تم شراء الجزء لكن تعذر تحديث الرصيد.");
+      return;
+    }
+
     setTeamParts((previous) => ({
       ...previous,
       [loggedTeam.id]: [
@@ -470,16 +491,6 @@ ${insertError.message || "خطأ غير معروف"}`
     }));
 
     setTimeLeft(Math.max(1, Number(part.buildTime || 0) * 60));
-
-    const { error: balanceError } = await updateTeam(loggedTeam.id, {
-      balance: balance - price,
-    });
-
-    if (balanceError) {
-      console.error("BALANCE UPDATE ERROR:", balanceError);
-      showNotice("⚠️ تم شراء الجزء لكن تعذر تحديث الرصيد.");
-      return;
-    }
 
     showNotice(`🏕️ تم شراء ${part.name} بنجاح! بدأ البناء.`);
   }
@@ -529,12 +540,14 @@ ${insertError.message || "خطأ غير معروف"}`
 
     const newCompletedParts = team.completedParts + 1;
 
-    updateTeam(teamId, {
+    const { error: teamUpdateError } = await updateTeam(teamId, {
       completedParts: newCompletedParts,
       progress: Math.round(
         (newCompletedParts / parts.length) * 100
       ),
     });
+
+    if (teamUpdateError) return;
 
     showNotice(
       `🎉 اكتمل بناء ${part.name}! يمكنك الآن بناء جزء جديد.`
@@ -574,10 +587,12 @@ ${insertError.message || "خطأ غير معروف"}`
       ],
     }));
 
-    updateTeam(loggedTeam.id, {
+    const { error: teamUpdateError } = await updateTeam(loggedTeam.id, {
       balance: loggedTeam.balance + station.reward,
       stations: loggedTeam.stations + 1,
     });
+
+    if (teamUpdateError) return;
 
     showNotice(
       `🎉 أحسنت! حصلتم على ${station.reward} جنيه.`
@@ -589,16 +604,22 @@ ${insertError.message || "خطأ غير معروف"}`
     if (!team) return;
 
     const newBalance = Math.max(0, team.balance + amount);
-    await updateTeam(teamId, { balance: newBalance });
+    const { error } = await updateTeam(teamId, { balance: newBalance });
+
+    if (error) return;
+
     showNotice(`💰 تم تعديل رصيد ${team.name}.`);
   }
 
-  function adminAdjustEngineers(teamId, delta) {
+  async function adminAdjustEngineers(teamId, delta) {
     const team = teams.find((item) => item.id === teamId);
     if (!team) return;
 
     const newEngineers = Math.max(0, team.engineers + delta);
-    updateTeam(teamId, { engineers: newEngineers });
+    const { error } = await updateTeam(teamId, { engineers: newEngineers });
+
+    if (error) return;
+
     showNotice(`👷 تم تحديث عدد مهندسي ${team.name}.`);
   }
 
@@ -683,10 +704,12 @@ ${insertError.message || "خطأ غير معروف"}`
 
     const newCompletedParts = team.completedParts + 1;
 
-    updateTeam(teamId, {
+    const { error: teamUpdateError } = await updateTeam(teamId, {
       completedParts: newCompletedParts,
       progress: Math.round((newCompletedParts / parts.length) * 100),
     });
+
+    if (teamUpdateError) return;
 
     showNotice(`🎉 تم تعليم "${part.name}" كمكتمل لفريق ${team.name}.`);
   }
@@ -738,10 +761,12 @@ ${insertError.message || "خطأ غير معروف"}`
     if (existing.status === "completed") {
       const newCompletedParts = Math.max(0, team.completedParts - 1);
 
-      updateTeam(teamId, {
+      const { error: teamUpdateError } = await updateTeam(teamId, {
         completedParts: newCompletedParts,
         progress: Math.round((newCompletedParts / parts.length) * 100),
       });
+
+      if (teamUpdateError) return;
     }
 
     showNotice(`↩️ تم إلغاء "${part.name}" لفريق ${team.name}.`);
@@ -774,10 +799,12 @@ ${insertError.message || "خطأ غير معروف"}`
         ),
       }));
 
-      updateTeam(teamId, {
+      const { error: teamUpdateError } = await updateTeam(teamId, {
         balance: Math.max(0, team.balance - station.reward),
         stations: Math.max(0, team.stations - 1),
       });
+
+      if (teamUpdateError) return;
 
       showNotice(`↩️ تم إلغاء محطة "${station.name}" لفريق ${team.name}.`);
     } else {
@@ -797,10 +824,12 @@ ${insertError.message || "خطأ غير معروف"}`
         [teamId]: [...(previous[teamId] || []), station.id],
       }));
 
-      updateTeam(teamId, {
+      const { error: teamUpdateError } = await updateTeam(teamId, {
         balance: team.balance + station.reward,
         stations: team.stations + 1,
       });
+
+      if (teamUpdateError) return;
 
       showNotice(
         `✅ تم تعليم محطة "${station.name}" كمكتملة لفريق ${team.name}.`
