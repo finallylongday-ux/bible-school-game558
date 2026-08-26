@@ -65,10 +65,10 @@ CREATE TABLE IF NOT EXISTS team_stations (
 -- 4. إدخال أو تحديث بيانات الفرق الافتراضية
 INSERT INTO teams (id, name, pin, balance, engineers, progress, completed_parts, stations)
 VALUES
-    (1, 'فريق 1', '1111', 0, 0, 0, 0, 0),
-    (2, 'فريق 2', '2222', 0, 0, 0, 0, 0),
-    (3, 'فريق 3', '3333', 0, 0, 0, 0, 0),
-    (4, 'فريق 4', '4444', 0, 0, 0, 0, 0)
+    (1, 'فريق 1', '1111', 1000, 1, 0, 0, 0),
+    (2, 'فريق 2', '2222', 1000, 1, 0, 0, 0),
+    (3, 'فريق 3', '3333', 1000, 1, 0, 0, 0),
+    (4, 'فريق 4', '4444', 1000, 1, 0, 0, 0)
 ON CONFLICT (id) DO UPDATE SET
     name = EXCLUDED.name,
     pin = EXCLUDED.pin;

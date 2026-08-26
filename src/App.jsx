@@ -187,9 +187,6 @@ function App() {
   const [teamStationResults, setTeamStationResults] = useState(() =>
     getLocal(STORAGE_KEYS.TEAM_STATIONS, {})
   );
-  const [currentBuild, setCurrentBuild] = useState(() =>
-    getLocal(STORAGE_KEYS.CURRENT_BUILD, {})
-  );
   const [activities, setActivities] = useState(() =>
     getLocal(STORAGE_KEYS.ACTIVITIES, [
       { id: 1, text: "🏕️ مرحباً بكم في لعبة بناء خيمة الاجتماع!", time: "الآن" },
@@ -198,7 +195,7 @@ function App() {
   );
 
   const [loading, setLoading] = useState(true);
-  const [timeLeft, setTimeLeft] = useState(0);
+  const [currentTime, setCurrentTime] = useState(Date.now());
   const [notice, setNotice] = useState("");
 
   // Team login
@@ -218,7 +215,7 @@ function App() {
   // Modals
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showActivityModal, setShowActivityModal] = useState(false);
-  const [missingReqModal, setMissingReqModal] = useState(null); // { type: 'engineer'|'balance', part, missing }
+  const [missingReqModal, setMissingReqModal] = useState(null); // { type: 'no_engineer'|'engineers_busy'|'balance', part, ... }
   const [customBalanceAmount, setCustomBalanceAmount] = useState("");
   const [editingPinTeamId, setEditingPinTeamId] = useState(null);
   const [newTeamPin, setNewTeamPin] = useState("");
@@ -237,12 +234,16 @@ function App() {
   }, [teamStationResults]);
 
   useEffect(() => {
-    setLocal(STORAGE_KEYS.CURRENT_BUILD, currentBuild);
-  }, [currentBuild]);
-
-  useEffect(() => {
     setLocal(STORAGE_KEYS.ACTIVITIES, activities);
   }, [activities]);
+
+  // Central 1-second ticker for countdowns and auto-completion
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Load from Supabase on mount
   useEffect(() => {
@@ -284,22 +285,41 @@ function App() {
           supabase.from("team_stations").select("*"),
         ]);
 
+      let loadedTeams = INITIAL_TEAMS;
       if (teamsResult.data && teamsResult.data.length > 0) {
-        setTeams(
-          teamsResult.data.map((team) => ({
+        loadedTeams = teamsResult.data.map((team) => {
+          const rawBal = Number(team.balance ?? 0);
+          const rawEng = Number(team.engineers ?? 0);
+          const compParts = Number(team.completed_parts ?? team.completedParts ?? 0);
+          const stCount = Number(team.stations ?? 0);
+          // If team has 0 balance and 0 engineers, grant default 1000 LE and 1 engineer
+          const hasZeroInit = rawBal === 0 && rawEng === 0 && compParts === 0 && stCount === 0;
+          return {
             ...team,
-            completedParts: team.completed_parts ?? team.completedParts ?? 0,
-          }))
-        );
+            balance: hasZeroInit ? 1000 : rawBal,
+            engineers: hasZeroInit ? 1 : rawEng,
+            completedParts: compParts,
+            stations: stCount,
+          };
+        });
+        setTeams(loadedTeams);
+
+        // Fix uninitialized 0 balance/engineers in Supabase in background
+        loadedTeams.forEach((t) => {
+          if (t.balance === 1000 && t.engineers === 1 && t.completedParts === 0 && t.stations === 0) {
+            supabase.from("teams").update({ balance: 1000, engineers: 1 }).eq("id", t.id).catch(() => {});
+          }
+        });
       }
 
+      let activePartsList = INITIAL_PARTS;
       if (partsResult.data && partsResult.data.length > 0) {
-        setParts(
-          partsResult.data.map((part) => ({
-            ...part,
-            buildTime: part.build_time ?? part.buildTime ?? 20,
-          }))
-        );
+        activePartsList = partsResult.data.map((part) => ({
+          ...part,
+          buildTime: Number(part.build_time ?? part.buildTime ?? 20),
+          price: Number(part.price ?? 0),
+        }));
+        setParts(activePartsList);
       }
 
       if (stationsResult.data && stationsResult.data.length > 0) {
@@ -308,42 +328,74 @@ function App() {
 
       if (teamPartsResult.data) {
         const partsByTeam = {};
+        const now = Date.now();
+        const autoCompletedByTeam = {};
+
         teamPartsResult.data.forEach((item) => {
-          if (!partsByTeam[item.team_id]) partsByTeam[item.team_id] = [];
-          partsByTeam[item.team_id].push({
-            partId: Number(item.part_id),
-            status: item.status,
-            purchasedAt: new Date(item.purchased_at || Date.now()).getTime(),
-            completedAt: item.completed_at ? new Date(item.completed_at).getTime() : null,
+          const tId = Number(item.team_id);
+          const pId = Number(item.part_id);
+          const partInfo = activePartsList.find((p) => p.id === pId);
+          const buildDuration = (partInfo?.buildTime || 20) * 1000;
+          const purchasedAt = new Date(item.purchased_at || now).getTime();
+          let status = item.status || "building";
+          let completedAt = item.completed_at ? new Date(item.completed_at).getTime() : null;
+
+          // Auto-complete if build duration has already elapsed
+          if (status === "building" && now >= purchasedAt + buildDuration) {
+            status = "completed";
+            completedAt = purchasedAt + buildDuration;
+            autoCompletedByTeam[tId] = (autoCompletedByTeam[tId] || 0) + 1;
+            // Background sync to Supabase
+            supabase
+              .from("team_parts")
+              .update({ status: "completed", completed_at: new Date(completedAt).toISOString() })
+              .eq("id", item.id)
+              .catch(() => {});
+          }
+
+          if (!partsByTeam[tId]) partsByTeam[tId] = [];
+          partsByTeam[tId].push({
+            partId: pId,
+            status,
+            purchasedAt,
+            completedAt,
             dbId: item.id,
           });
         });
+
         setTeamParts(partsByTeam);
 
-        // Check active builds
-        const builds = {};
-        const now = Date.now();
-        const activePartsList = partsResult.data?.length ? partsResult.data : INITIAL_PARTS;
-
-        Object.entries(partsByTeam).forEach(([teamId, items]) => {
-          const building = items.find((item) => item.status === "building");
-          if (!building) return;
-          const part = activePartsList.find((p) => p.id === building.partId);
-          if (!part) return;
-          const elapsed = Math.floor((now - building.purchasedAt) / 1000);
-          const duration = part.build_time || part.buildTime || 20;
-          if (elapsed < duration) {
-            builds[Number(teamId)] = building.partId;
-          }
-        });
-        setCurrentBuild(builds);
+        // Update team stats if builds were auto-completed on load
+        if (Object.keys(autoCompletedByTeam).length > 0) {
+          setTeams((prevTeams) =>
+            prevTeams.map((team) => {
+              const teamCompletedCount = (partsByTeam[team.id] || []).filter(
+                (p) => p.status === "completed"
+              ).length;
+              const newProgress = Math.min(
+                100,
+                Math.round((teamCompletedCount / activePartsList.length) * 100)
+              );
+              if (team.completedParts !== teamCompletedCount || team.progress !== newProgress) {
+                supabase
+                  .from("teams")
+                  .update({ completed_parts: teamCompletedCount, progress: newProgress })
+                  .eq("id", team.id)
+                  .catch(() => {});
+                return { ...team, completedParts: teamCompletedCount, progress: newProgress };
+              }
+              return team;
+            })
+          );
+        }
       }
 
       if (teamStationsResult.data) {
         const stationsByTeam = {};
         teamStationsResult.data.forEach((item) => {
-          if (!stationsByTeam[item.team_id]) stationsByTeam[item.team_id] = [];
-          stationsByTeam[item.team_id].push(Number(item.station_id));
+          const tId = Number(item.team_id);
+          if (!stationsByTeam[tId]) stationsByTeam[tId] = [];
+          stationsByTeam[tId].push(Number(item.station_id));
         });
         setTeamStationResults(stationsByTeam);
       }
@@ -356,8 +408,9 @@ function App() {
 
   // Helper to update team in local state & Supabase
   async function updateTeam(teamId, changes) {
-    const updatedTeams = teams.map((t) => (t.id === teamId ? { ...t, ...changes } : t));
-    setTeams(updatedTeams);
+    setTeams((prevTeams) =>
+      prevTeams.map((t) => (t.id === teamId ? { ...t, ...changes } : t))
+    );
 
     // Background sync to Supabase
     try {
@@ -377,14 +430,15 @@ function App() {
   // ==========================================
 
   const loggedTeam = teams.find((team) => team.id === loggedTeamId);
-  const purchasedParts = teamParts[loggedTeamId] || [];
-  const currentPartId = currentBuild[loggedTeamId];
-  const currentPart = parts.find((part) => part.id === currentPartId);
-  const currentStationResults = teamStationResults[loggedTeamId] || [];
-
+  const teamItems = teamParts[loggedTeamId] || [];
+  const completedParts = teamItems.filter((item) => item.status === "completed");
+  const activeBuildingItems = teamItems.filter((item) => item.status === "building");
+  const busyEngineers = activeBuildingItems.length;
   const availableEngineers = loggedTeam
-    ? Math.max(0, (loggedTeam.engineers || 0) - (currentPart ? 1 : 0))
+    ? Math.max(0, (loggedTeam.engineers || 0) - busyEngineers)
     : 0;
+
+  const currentStationResults = teamStationResults[loggedTeamId] || [];
 
   const sortedTeams = useMemo(() => {
     return [...teams].sort((a, b) => {
@@ -395,50 +449,29 @@ function App() {
     });
   }, [teams]);
 
-  // Live timer effect for building parts (in seconds)
+  // Check any active building part that completed on the live ticker
   useEffect(() => {
-    if (!currentPartId || !loggedTeamId) {
-      setTimeLeft(0);
-      return;
-    }
+    if (!loggedTeamId) return;
 
-    const part = parts.find((p) => p.id === currentPartId);
-    if (!part) return;
+    activeBuildingItems.forEach((buildingItem) => {
+      const part = parts.find((p) => p.id === buildingItem.partId);
+      const durationSec = Number(part?.buildTime || 20);
+      const elapsedSec = Math.floor((currentTime - buildingItem.purchasedAt) / 1000);
+      if (elapsedSec >= durationSec) {
+        completeBuild(loggedTeamId, buildingItem.partId);
+      }
+    });
+  }, [currentTime, loggedTeamId, activeBuildingItems, parts]);
 
-    const teamItems = teamParts[loggedTeamId] || [];
-    const activeItem = teamItems.find(
-      (item) => item.partId === currentPartId && item.status === "building"
-    );
-
-    const now = Date.now();
-    const purchasedAt = activeItem?.purchasedAt || now;
-    const totalDurationSec = Number(part.buildTime || 20);
-    const elapsedSec = Math.floor((now - purchasedAt) / 1000);
-    const initialTimeLeft = Math.max(1, totalDurationSec - elapsedSec);
-
-    setTimeLeft(initialTimeLeft);
-
-    const interval = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          completeBuild(loggedTeamId, currentPartId);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [currentPartId, loggedTeamId]);
-
-  // Compute live build percentage
-  const liveBuildPercent = useMemo(() => {
-    if (!currentPart || timeLeft <= 0) return 0;
-    const total = Number(currentPart.buildTime || 20);
-    const done = total - timeLeft;
-    return Math.min(100, Math.max(0, Math.round((done / total) * 100)));
-  }, [currentPart, timeLeft]);
+  // Helper to get time and progress of a building item
+  function getBuildProgress(buildingItem) {
+    const part = parts.find((p) => p.id === buildingItem.partId);
+    const durationSec = Math.max(1, Number(part?.buildTime || 20));
+    const elapsedSec = Math.max(0, Math.floor((currentTime - buildingItem.purchasedAt) / 1000));
+    const remainingSec = Math.max(0, durationSec - elapsedSec);
+    const percent = Math.min(100, Math.max(0, Math.round((elapsedSec / durationSec) * 100)));
+    return { part, durationSec, elapsedSec, remainingSec, percent };
+  }
 
   // ==========================================
   // AUTH ACTIONS
@@ -536,13 +569,13 @@ function App() {
   // TEAM GAMEPLAY ACTIONS
   // ==========================================
 
-  async function buyEngineer() {
-    if (!loggedTeam) return;
+  async function buyEngineer(autoStartPart = null) {
+    if (!loggedTeam) return false;
 
     const price = 500;
     if (loggedTeam.balance < price) {
-      showNotice("❌ الرصيد غير كافٍ لشراء مهندس (السعر 500 جنيه).", true);
-      return;
+      showNotice("❌ الرصيد غير كافٍ لتوظيف مهندس (السعر: 500 جنيه).", true);
+      return false;
     }
 
     const newBalance = loggedTeam.balance - price;
@@ -556,23 +589,37 @@ function App() {
     playSound("buy");
     showNotice("👷 تم توظيف مهندس جديد بنجاح!");
     addActivity(`👷 قام ${loggedTeam.name} بتوظيف مهندس جديد.`);
+
+    if (autoStartPart) {
+      if (newBalance >= autoStartPart.price) {
+        setTimeout(() => {
+          buyPart(autoStartPart);
+        }, 200);
+      } else {
+        showNotice(`👷 تم توظيف المهندس! ينقصكم ${autoStartPart.price - newBalance} جنيه لبدء بناء "${autoStartPart.name}".`);
+      }
+    }
+    return true;
   }
 
   async function buyPart(part) {
     if (!loggedTeam) return;
 
-    // 1. Check if another part is already building
-    if (currentPartId) {
-      showNotice("⏳ يوجد جزء قيد البناء حالياً. انتظر حتى يكتمل.", true);
+    // 1. Check if already completed
+    const isCompleted = completedParts.some(
+      (item) => Number(item.partId) === Number(part.id)
+    );
+    if (isCompleted) {
+      showNotice("✅ هذا الجزء تم بناؤه بالفعل.", true);
       return;
     }
 
-    // 2. Check if already purchased
-    const alreadyOwned = purchasedParts.some(
+    // 2. Check if currently building
+    const isBuilding = activeBuildingItems.some(
       (item) => Number(item.partId) === Number(part.id)
     );
-    if (alreadyOwned) {
-      showNotice("✅ هذا الجزء تم شراؤه بالفعل.", true);
+    if (isBuilding) {
+      showNotice("🔨 هذا الجزء قيد البناء حالياً. انتظر حتى يكتمل.", true);
       return;
     }
 
@@ -580,9 +627,19 @@ function App() {
     if (Number(loggedTeam.engineers || 0) <= 0) {
       playSound("error");
       setMissingReqModal({
-        type: "engineer",
+        type: "no_engineer",
         part,
-        needed: 500,
+      });
+      return;
+    }
+
+    if (availableEngineers <= 0) {
+      playSound("error");
+      setMissingReqModal({
+        type: "engineers_busy",
+        part,
+        busyCount: busyEngineers,
+        totalCount: loggedTeam.engineers,
       });
       return;
     }
@@ -614,21 +671,15 @@ function App() {
     // Update local state immediately
     setTeamParts((prev) => ({
       ...prev,
-      [loggedTeam.id]: [...(prev[loggedTeam.id] || []), newTeamPart],
+      [loggedTeam.id]: [...(prev[loggedTeam.id] || []).filter((p) => p.partId !== part.id), newTeamPart],
     }));
-
-    setCurrentBuild((prev) => ({
-      ...prev,
-      [loggedTeam.id]: part.id,
-    }));
-
-    const durationSec = Math.max(1, Number(part.buildTime || 20));
-    setTimeLeft(durationSec);
 
     // Deduct balance
     await updateTeam(loggedTeam.id, {
       balance: balance - price,
     });
+
+    const durationSec = Math.max(1, Number(part.buildTime || 20));
 
     // Background sync to Supabase
     try {
@@ -644,7 +695,7 @@ function App() {
     }
 
     playSound("buy");
-    showNotice(`🏕️ بدأ الآن بناء ${part.name}! (الوقت: ${durationSec} ثانية)`);
+    showNotice(`🏕️ بدأ الآن بناء "${part.name}"! (الوقت: ${durationSec} ثانية)`);
     addActivity(`🏕️ بدأ ${loggedTeam.name} بناء "${part.name}".`);
   }
 
@@ -652,40 +703,36 @@ function App() {
     const part = parts.find((item) => item.id === partId);
     if (!part) return;
 
-    // 1. Update team parts
-    setTeamParts((prev) => ({
-      ...prev,
-      [teamId]: (prev[teamId] || []).map((item) =>
-        item.partId === partId
-          ? { ...item, status: "completed", completedAt: Date.now() }
-          : item
-      ),
-    }));
+    const team = teams.find((item) => item.id === teamId);
 
-    // 2. Clear current build
-    setCurrentBuild((prev) => {
-      const next = { ...prev };
-      delete next[teamId];
-      return next;
+    // 1. Update team parts
+    let alreadyComplete = false;
+    setTeamParts((prev) => {
+      const teamList = prev[teamId] || [];
+      const updated = teamList.map((item) => {
+        if (item.partId === partId) {
+          if (item.status === "completed") alreadyComplete = true;
+          return { ...item, status: "completed", completedAt: Date.now() };
+        }
+        return item;
+      });
+      return { ...prev, [teamId]: updated };
     });
 
-    if (loggedTeamId === teamId) {
-      setTimeLeft(0);
-    }
+    if (alreadyComplete) return;
 
-    // 3. Update team stats
-    const team = teams.find((item) => item.id === teamId);
-    if (team) {
-      const newCompletedParts = (team.completedParts || 0) + 1;
-      const newProgress = Math.min(100, Math.round((newCompletedParts / parts.length) * 100));
+    // 2. Update team stats
+    const currentCompletedCount = (teamParts[teamId] || [])
+      .filter((item) => item.status === "completed" || item.partId === partId)
+      .length;
+    const newProgress = Math.min(100, Math.round((currentCompletedCount / parts.length) * 100));
 
-      await updateTeam(teamId, {
-        completedParts: newCompletedParts,
-        progress: newProgress,
-      });
-    }
+    await updateTeam(teamId, {
+      completedParts: currentCompletedCount,
+      progress: newProgress,
+    });
 
-    // 4. Background sync
+    // 3. Background sync to Supabase
     try {
       await supabase
         .from("team_parts")
@@ -700,7 +747,7 @@ function App() {
     }
 
     playSound("complete");
-    showNotice(`🎉 اكتمل بناء ${part.name} بنجاح! نسبة إنجاز الخيمة زادت! 🏕️`);
+    showNotice(`🎉 اكتمل بناء "${part.name}" بنجاح! نسبة إنجاز الخيمة زادت! 🏕️`);
     addActivity(`🎉 أتم ${team?.name || "فريق"} بناء "${part.name}".`);
   }
 
@@ -738,7 +785,7 @@ function App() {
     }
 
     playSound("success");
-    showNotice(`🎉 أحسنتم! تم إنجاز ${station.name} وحصلتم على ${station.reward} جنيه.`);
+    showNotice(`🎉 أحسنتم! تم إنجاز "${station.name}" وحصلتم على ${station.reward} جنيه.`);
     addActivity(`🗺️ أتم ${loggedTeam.name} "${station.name}" (+${station.reward} جنيه).`);
   }
 
@@ -818,17 +865,7 @@ function App() {
       return { ...prev, [teamId]: updated };
     });
 
-    // 2. Clear current build if active
-    if (currentBuild[teamId] === part.id) {
-      setCurrentBuild((prev) => {
-        const next = { ...prev };
-        delete next[teamId];
-        return next;
-      });
-      if (loggedTeamId === teamId) setTimeLeft(0);
-    }
-
-    // 3. Update team stats
+    // 2. Update team stats
     const newCompleted = (team.completedParts || 0) + 1;
     const newProgress = Math.min(100, Math.round((newCompleted / parts.length) * 100));
 
@@ -837,7 +874,7 @@ function App() {
       progress: newProgress,
     });
 
-    // 4. Background sync
+    // 3. Background sync
     try {
       if (existing) {
         await supabase
@@ -879,17 +916,7 @@ function App() {
       [teamId]: (prev[teamId] || []).filter((item) => item.partId !== part.id),
     }));
 
-    // 2. Clear build if active
-    if (currentBuild[teamId] === part.id) {
-      setCurrentBuild((prev) => {
-        const next = { ...prev };
-        delete next[teamId];
-        return next;
-      });
-      if (loggedTeamId === teamId) setTimeLeft(0);
-    }
-
-    // 3. Decrement completed if it was complete
+    // 2. Decrement completed if it was complete
     if (existing.status === "completed") {
       const newCompleted = Math.max(0, (team.completedParts || 0) - 1);
       const newProgress = Math.round((newCompleted / parts.length) * 100);
@@ -899,7 +926,7 @@ function App() {
       });
     }
 
-    // 4. Background sync
+    // 3. Background sync
     try {
       await supabase
         .from("team_parts")
@@ -1008,11 +1035,6 @@ function App() {
 
     setTeamParts((prev) => ({ ...prev, [teamId]: [] }));
     setTeamStationResults((prev) => ({ ...prev, [teamId]: [] }));
-    setCurrentBuild((prev) => {
-      const next = { ...prev };
-      delete next[teamId];
-      return next;
-    });
 
     await updateTeam(teamId, {
       balance: 1000,
@@ -1034,7 +1056,6 @@ function App() {
 
     setTeamParts({});
     setTeamStationResults({});
-    setCurrentBuild({});
 
     const resetTeamsList = teams.map((team) => ({
       ...team,
@@ -1359,49 +1380,58 @@ function App() {
             </div>
           </section>
 
-          {/* ACTIVE BUILDING LIVE BANNER */}
-          {currentPart && (
-            <div className="active-build-card">
-              <div className="active-build-header">
-                <div className="active-build-title">
-                  <span className="hammer-icon">🔨</span>
-                  <div>
-                    <span>جاري البناء الآن: </span>
-                    <strong style={{ color: "#ffd875" }}>
-                      {currentPart.icon} {currentPart.name}
-                    </strong>
+          {/* ACTIVE BUILDING LIVE CARDS */}
+          {activeBuildingItems.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px", margin: "18px 0" }}>
+              {activeBuildingItems.map((bItem) => {
+                const { part, durationSec, remainingSec, percent } = getBuildProgress(bItem);
+                if (!part) return null;
+
+                return (
+                  <div className="active-build-card" key={bItem.partId} style={{ margin: 0 }}>
+                    <div className="active-build-header">
+                      <div className="active-build-title">
+                        <span className="hammer-icon">🔨</span>
+                        <div>
+                          <span>جاري البناء الآن: </span>
+                          <strong style={{ color: "#ffd875" }}>
+                            {part.icon} {part.name}
+                          </strong>
+                        </div>
+                      </div>
+
+                      <div className="build-timer-badge">
+                        ⏱️ {formatTime(remainingSec)}
+                      </div>
+                    </div>
+
+                    <div className="build-live-progress-container">
+                      <div
+                        className="build-live-progress-bar"
+                        style={{ width: `${percent}%` }}
+                      />
+                      <div className="build-live-progress-text">
+                        {percent}% مكتمل ({durationSec - remainingSec}/{durationSec} ثانية)
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px", flexWrap: "wrap", gap: "8px" }}>
+                      <small style={{ color: "#f7d794" }}>
+                        👷 مهندس يشرف على هذا الجزء. بمجرد انتهاء الوقت سيكتمل تلقائياً!
+                      </small>
+
+                      <button
+                        className="panel-button"
+                        style={{ margin: 0, padding: "5px 12px", fontSize: "12px", background: "#e67e22" }}
+                        onClick={() => completeBuild(loggedTeam.id, part.id)}
+                        title="إنهاء وتسريع البناء فوراً"
+                      >
+                        ⚡ إنهاء البناء فوراً
+                      </button>
+                    </div>
                   </div>
-                </div>
-
-                <div className="build-timer-badge">
-                  ⏱️ {formatTime(timeLeft)}
-                </div>
-              </div>
-
-              <div className="build-live-progress-container">
-                <div
-                  className="build-live-progress-bar"
-                  style={{ width: `${liveBuildPercent}%` }}
-                />
-                <div className="build-live-progress-text">
-                  {liveBuildPercent}% مكتمل
-                </div>
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
-                <small style={{ color: "#f7d794" }}>
-                  👷 المهندس يعمل على هذا الجزء الآن. بمجرد انتهاء الوقت سيكتمل تلقائياً!
-                </small>
-
-                <button
-                  className="panel-button"
-                  style={{ margin: 0, padding: "4px 10px", fontSize: "11px", background: "#e67e22" }}
-                  onClick={() => completeBuild(loggedTeam.id, currentPart.id)}
-                  title="تسريع الإنهاء للتجربة"
-                >
-                  ⚡ تسريع وإنهاء البناء فوراً
-                </button>
-              </div>
+                );
+              })}
             </div>
           )}
 
@@ -1416,7 +1446,7 @@ function App() {
               <div className="progress-bar" style={{ width: `${loggedTeam.progress}%` }} />
             </div>
 
-            {!currentPart && (
+            {activeBuildingItems.length === 0 && (
               <p>
                 لا يوجد جزء قيد البناء حالياً. ادخل على <strong>أجزاء الخيمة</strong> لبدء بناء جزء جديد!
               </p>
@@ -1482,11 +1512,14 @@ function App() {
 
                   <div className="parts-grid">
                     {parts.map((part) => {
-                      const owned = purchasedParts.find(
+                      const isCompleted = completedParts.some(
                         (item) => Number(item.partId) === Number(part.id)
                       );
-                      const isBuilding = owned?.status === "building";
-                      const isCompleted = owned?.status === "completed";
+                      const buildingItem = activeBuildingItems.find(
+                        (item) => Number(item.partId) === Number(part.id)
+                      );
+                      const isBuilding = Boolean(buildingItem);
+                      const progressInfo = buildingItem ? getBuildProgress(buildingItem) : null;
 
                       return (
                         <div
@@ -1506,16 +1539,19 @@ function App() {
                               ✅ تم بناؤه بنجاح
                             </button>
                           ) : isBuilding ? (
-                            <button className="building-button" disabled>
-                              🔨 جاري البناء ({formatTime(timeLeft)})
+                            <button
+                              className="building-button"
+                              onClick={() => completeBuild(loggedTeam.id, part.id)}
+                              title="اضغط لإنهاء وتسريع البناء فوراً"
+                            >
+                              🔨 جاري البناء ({formatTime(progressInfo?.remainingSec ?? 0)}) ⚡
                             </button>
                           ) : (
                             <button
                               className="buy-button"
                               onClick={() => buyPart(part)}
-                              disabled={Boolean(currentPart)}
                             >
-                              {currentPart ? "⏳ يوجد بناء حالي" : "شراء وبدء البناء 🔨"}
+                              شراء وبدء البناء 🔨
                             </button>
                           )}
                         </div>
@@ -1652,11 +1688,12 @@ function App() {
                 <button className="modal-close-btn" onClick={() => setMissingReqModal(null)}>✕</button>
               </div>
               <div className="modal-body">
-                {missingReqModal.type === "engineer" && (
+                {(missingReqModal.type === "no_engineer" || missingReqModal.type === "engineer") && (
                   <div className="missing-req-box">
-                    <h3>👷 لا يوجد مهندس متاح لبناء {missingReqModal.part?.name}!</h3>
+                    <h3>👷 لا يوجد مهندسون مسجلون لفريقكم!</h3>
                     <p style={{ marginTop: "8px" }}>
-                      لبدء بناء أي جزء، يجب أن يكون لديكم مهندس متاح للإشراف على البناء.
+                      لبدء بناء أجزاء الخيمة، تحتاجون لتوظيف مهندس للإشراف على البناء.
+                      <br />
                       سعر توظيف المهندس هو <strong>500 جنيه</strong>.
                     </p>
                     <div className="missing-req-actions">
@@ -1665,11 +1702,49 @@ function App() {
                           className="panel-button"
                           style={{ margin: 0, background: "#27ae60" }}
                           onClick={() => {
-                            buyEngineer();
+                            const partToBuild = missingReqModal.part;
                             setMissingReqModal(null);
+                            buyEngineer(partToBuild);
                           }}
                         >
                           👷 توظيف مهندس الآن (500 جنيه)
+                        </button>
+                      ) : (
+                        <button
+                          className="panel-button"
+                          style={{ margin: 0 }}
+                          onClick={() => {
+                            setMissingReqModal(null);
+                            goTeamPage("stations");
+                          }}
+                        >
+                          🗺️ اذهب للمحطات لكسب المال
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {missingReqModal.type === "engineers_busy" && (
+                  <div className="missing-req-box">
+                    <h3>👷 جميع المهندسين مشغولون بالبناء حالياً!</h3>
+                    <p style={{ marginTop: "8px" }}>
+                      كل مهندس يشرف على بناء جزء واحد. لديكم <strong>{missingReqModal.totalCount} مهندس</strong> يعملون حالياً على بناء <strong>{missingReqModal.busyCount} جزء</strong>.
+                      <br />
+                      يمكنكم توظيف مهندس إضافي (500 جنيه) للبناء بالتوازي أو انتظار اكتمال البناء الحالي!
+                    </p>
+                    <div className="missing-req-actions">
+                      {loggedTeam.balance >= 500 ? (
+                        <button
+                          className="panel-button"
+                          style={{ margin: 0, background: "#27ae60" }}
+                          onClick={() => {
+                            const partToBuild = missingReqModal.part;
+                            setMissingReqModal(null);
+                            buyEngineer(partToBuild);
+                          }}
+                        >
+                          👷 توظيف مهندس إضافي ومتابعة البناء (500 جنيه)
                         </button>
                       ) : (
                         <button
