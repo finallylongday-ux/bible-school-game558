@@ -396,13 +396,11 @@ function App() {
   async function buyPart(part) {
     if (!loggedTeam) return;
 
-    // لا يمكن بناء أكثر من جزء في نفس الوقت
     if (currentPartId) {
       showNotice("⏳ يوجد جزء قيد البناء حاليًا. انتظر حتى يكتمل.");
       return;
     }
 
-    // منع شراء نفس الجزء أكثر من مرة
     const alreadyOwned = purchasedParts.some(
       (item) => Number(item.partId) === Number(part.id)
     );
@@ -412,13 +410,11 @@ function App() {
       return;
     }
 
-    // يجب أن يكون هناك مهندس متاح
     if (Number(loggedTeam.engineers || 0) <= 0) {
       showNotice("👷 تحتاج إلى مهندس متاح لبناء هذا الجزء.");
       return;
     }
 
-    // التأكد من الرصيد
     const price = Number(part.price || 0);
     const balance = Number(loggedTeam.balance || 0);
 
@@ -429,8 +425,9 @@ function App() {
 
     const purchasedAt = Date.now();
 
-    // حفظ الشراء أولًا في Supabase
-    const { data: insertedPart, error: insertError } = await supabase
+    // لا نستخدم select() بعد insert حتى لا تتوقف العملية
+    // إذا كانت RLS تسمح بالـ INSERT ولا تسمح بالـ SELECT.
+    const { error: insertError } = await supabase
       .from("team_parts")
       .insert({
         team_id: loggedTeam.id,
@@ -438,25 +435,25 @@ function App() {
         status: "building",
         purchased_at: new Date(purchasedAt).toISOString(),
         completed_at: null,
-      })
-      .select("*")
-      .single();
+      });
 
     if (insertError) {
-      console.error("Supabase part purchase error:", insertError);
+      console.error("BUY PART ERROR:", insertError);
+
       showNotice(
-        `⚠️ لم يتم حفظ شراء الجزء. ${insertError.message || ""}`
+        `❌ لم يتم شراء الجزء.
+${insertError.message || "خطأ غير معروف"}`
       );
+
       return;
     }
 
-    // تحديث الواجهة فور نجاح عملية الشراء
     const newTeamPart = {
       partId: part.id,
       status: "building",
       purchasedAt,
       completedAt: null,
-      dbId: insertedPart?.id ?? null,
+      dbId: null,
     };
 
     setTeamParts((previous) => ({
@@ -467,19 +464,22 @@ function App() {
       ],
     }));
 
-    // تشغيل البناء فورًا
     setCurrentBuild((previous) => ({
       ...previous,
       [loggedTeam.id]: part.id,
     }));
 
-    // تشغيل العداد فورًا
     setTimeLeft(Math.max(1, Number(part.buildTime || 0) * 60));
 
-    // خصم السعر من رصيد الفريق وحفظه
-    await updateTeam(loggedTeam.id, {
+    const { error: balanceError } = await updateTeam(loggedTeam.id, {
       balance: balance - price,
     });
+
+    if (balanceError) {
+      console.error("BALANCE UPDATE ERROR:", balanceError);
+      showNotice("⚠️ تم شراء الجزء لكن تعذر تحديث الرصيد.");
+      return;
+    }
 
     showNotice(`🏕️ تم شراء ${part.name} بنجاح! بدأ البناء.`);
   }
