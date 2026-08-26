@@ -2321,7 +2321,112 @@ button {
   to { opacity: 1; }
 }
 
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+/* =========================
+   BUILDING ANIMATIONS & TIMERS
+========================= */
+
+.active-build-card,
+.current-build-box {
+  background: linear-gradient(135deg, #422912, #211306);
+  border: 3px solid #f1c40f;
+  border-radius: 16px;
+  padding: 18px 22px;
+  margin: 18px 0;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45), inset 0 0 15px rgba(241, 196, 15, 0.2);
+  color: #fff0c7;
+  animation: pulseGlow 2s infinite alternate;
+}
+
+.active-build-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.active-build-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 20px;
+  font-weight: 900;
+  color: #ffeaa7;
+}
+
+.hammer-icon {
+  font-size: 32px;
+  display: inline-block;
+  animation: swingHammer 0.7s infinite alternate ease-in-out;
+}
+
+.build-timer-badge {
+  background: #d63031;
+  border: 2px solid #ff7675;
+  color: #fff;
+  padding: 6px 16px;
+  border-radius: 25px;
+  font-size: 18px;
+  font-weight: 900;
+  font-family: monospace;
+  letter-spacing: 1px;
+  box-shadow: 0 4px 10px rgba(214, 48, 49, 0.4);
+}
+
+.build-live-progress-container {
+  width: 100%;
+  height: 24px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 2px solid #a87932;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  margin: 10px 0 6px;
+}
+
+.build-live-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #f39c12, #2ecc71);
+  border-radius: 10px;
+  transition: width 0.3s ease;
+  box-shadow: 0 0 10px rgba(46, 204, 113, 0.6);
+}
+
+.build-live-progress-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 900;
+  color: #fff;
+  text-shadow: 1px 1px 2px #000;
+}
+
+.missing-req-box {
+  background: rgba(192, 57, 43, 0.2);
+  border: 2px solid #e74c3c;
+  border-radius: 12px;
+  padding: 16px;
+  margin: 15px 0;
+  color: #ffd2d2;
+}
+
+.missing-req-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+  flex-wrap: wrap;
+}
+
+@keyframes swingHammer {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(-40deg); }
+}
+
+@keyframes pulseGlow {
+  0% { border-color: #f1c40f; box-shadow: 0 8px 20px rgba(241, 196, 15, 0.25); }
+  100% { border-color: #2ecc71; box-shadow: 0 8px 25px rgba(46, 204, 113, 0.4); }
 }

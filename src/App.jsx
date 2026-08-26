@@ -11,8 +11,8 @@ const INITIAL_TEAMS = [
     id: 1,
     name: "فريق 1",
     pin: "1111",
-    balance: 0,
-    engineers: 0,
+    balance: 1000,
+    engineers: 1,
     progress: 0,
     completedParts: 0,
     stations: 0,
@@ -21,8 +21,8 @@ const INITIAL_TEAMS = [
     id: 2,
     name: "فريق 2",
     pin: "2222",
-    balance: 0,
-    engineers: 0,
+    balance: 1000,
+    engineers: 1,
     progress: 0,
     completedParts: 0,
     stations: 0,
@@ -31,8 +31,8 @@ const INITIAL_TEAMS = [
     id: 3,
     name: "فريق 3",
     pin: "3333",
-    balance: 0,
-    engineers: 0,
+    balance: 1000,
+    engineers: 1,
     progress: 0,
     completedParts: 0,
     stations: 0,
@@ -41,8 +41,8 @@ const INITIAL_TEAMS = [
     id: 4,
     name: "فريق 4",
     pin: "4444",
-    balance: 0,
-    engineers: 0,
+    balance: 1000,
+    engineers: 1,
     progress: 0,
     completedParts: 0,
     stations: 0,
@@ -51,18 +51,18 @@ const INITIAL_TEAMS = [
 
 const INITIAL_PARTS = [
   { id: 1, name: "سور الخيمة", price: 800, buildTime: 20, icon: "🪵" },
-  { id: 2, name: "باب الخيمة", price: 700, buildTime: 20, icon: "🚪" },
-  { id: 3, name: "مرحضة", price: 900, buildTime: 25, icon: "🪣" },
-  { id: 4, name: "مذبح المحرقة", price: 1200, buildTime: 30, icon: "🔥" },
-  { id: 5, name: "الأغطية", price: 1000, buildTime: 25, icon: "🧵" },
-  { id: 6, name: "القدس", price: 1400, buildTime: 30, icon: "🏛️" },
-  { id: 7, name: "المنارة الذهبية", price: 1800, buildTime: 35, icon: "🕎" },
-  { id: 8, name: "مذبح البخور", price: 1500, buildTime: 30, icon: "🪔" },
-  { id: 9, name: "مائدة خبز الوجوه", price: 1300, buildTime: 30, icon: "🍞" },
-  { id: 10, name: "قدس الأقداس", price: 2000, buildTime: 40, icon: "✨" },
-  { id: 11, name: "تابوت العهد", price: 2500, buildTime: 45, icon: "📦" },
-  { id: 12, name: "لباس رئيس الكهنة", price: 1700, buildTime: 35, icon: "👑" },
-  { id: 13, name: "مواد الخيمة", price: 1100, buildTime: 25, icon: "🧰" },
+  { id: 2, name: "باب الخيمة", price: 700, buildTime: 18, icon: "🚪" },
+  { id: 3, name: "مرحضة", price: 900, buildTime: 22, icon: "🪣" },
+  { id: 4, name: "مذبح المحرقة", price: 1200, buildTime: 25, icon: "🔥" },
+  { id: 5, name: "الأغطية", price: 1000, buildTime: 20, icon: "🧵" },
+  { id: 6, name: "القدس", price: 1400, buildTime: 28, icon: "🏛️" },
+  { id: 7, name: "المنارة الذهبية", price: 1800, buildTime: 30, icon: "🕎" },
+  { id: 8, name: "مذبح البخور", price: 1500, buildTime: 25, icon: "🪔" },
+  { id: 9, name: "مائدة خبز الوجوه", price: 1300, buildTime: 24, icon: "🍞" },
+  { id: 10, name: "قدس الأقداس", price: 2000, buildTime: 35, icon: "✨" },
+  { id: 11, name: "تابوت العهد", price: 2500, buildTime: 40, icon: "📦" },
+  { id: 12, name: "لباس رئيس الكهنة", price: 1700, buildTime: 30, icon: "👑" },
+  { id: 13, name: "مواد الخيمة", price: 1100, buildTime: 20, icon: "🧰" },
 ];
 
 const STATIONS = [
@@ -90,8 +90,8 @@ function playSound(type) {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = "sine";
-      osc.frequency.setValueAtTime(587.33, now); // D5
-      osc.frequency.exponentialRampToValueAtTime(880, now + 0.15); // A5
+      osc.frequency.setValueAtTime(587.33, now);
+      osc.frequency.exponentialRampToValueAtTime(880, now + 0.15);
       gain.gain.setValueAtTime(0.2, now);
       gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
       osc.connect(gain);
@@ -99,7 +99,7 @@ function playSound(type) {
       osc.start(now);
       osc.stop(now + 0.25);
     } else if (type === "complete" || type === "success") {
-      const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+      const notes = [523.25, 659.25, 783.99, 1046.5];
       notes.forEach((freq, i) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -137,7 +137,7 @@ function playSound(type) {
       osc.stop(now + 0.05);
     }
   } catch {
-    // Ignore audio errors if blocked by browser policy
+    // Ignore audio errors if blocked
   }
 }
 
@@ -146,13 +146,13 @@ function playSound(type) {
 // ==========================================
 
 const STORAGE_KEYS = {
-  TEAMS: "bsg_teams_v2",
-  PARTS: "bsg_parts_v2",
-  STATIONS: "bsg_stations_v2",
-  TEAM_PARTS: "bsg_team_parts_v2",
-  TEAM_STATIONS: "bsg_team_stations_v2",
-  CURRENT_BUILD: "bsg_current_build_v2",
-  ACTIVITIES: "bsg_activities_v2",
+  TEAMS: "bsg_teams_v3",
+  PARTS: "bsg_parts_v3",
+  STATIONS: "bsg_stations_v3",
+  TEAM_PARTS: "bsg_team_parts_v3",
+  TEAM_STATIONS: "bsg_team_stations_v3",
+  CURRENT_BUILD: "bsg_current_build_v3",
+  ACTIVITIES: "bsg_activities_v3",
 };
 
 function getLocal(key, fallback) {
@@ -218,6 +218,7 @@ function App() {
   // Modals
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showActivityModal, setShowActivityModal] = useState(false);
+  const [missingReqModal, setMissingReqModal] = useState(null); // { type: 'engineer'|'balance', part, missing }
   const [customBalanceAmount, setCustomBalanceAmount] = useState("");
   const [editingPinTeamId, setEditingPinTeamId] = useState(null);
   const [newTeamPin, setNewTeamPin] = useState("");
@@ -330,7 +331,7 @@ function App() {
           const part = activePartsList.find((p) => p.id === building.partId);
           if (!part) return;
           const elapsed = Math.floor((now - building.purchasedAt) / 1000);
-          const duration = (part.build_time || part.buildTime || 20) * 60;
+          const duration = part.build_time || part.buildTime || 20;
           if (elapsed < duration) {
             builds[Number(teamId)] = building.partId;
           }
@@ -394,7 +395,7 @@ function App() {
     });
   }, [teams]);
 
-  // Timer effect for building parts
+  // Live timer effect for building parts (in seconds)
   useEffect(() => {
     if (!currentPartId || !loggedTeamId) {
       setTimeLeft(0);
@@ -411,7 +412,7 @@ function App() {
 
     const now = Date.now();
     const purchasedAt = activeItem?.purchasedAt || now;
-    const totalDurationSec = (part.buildTime || 20) * 60;
+    const totalDurationSec = Number(part.buildTime || 20);
     const elapsedSec = Math.floor((now - purchasedAt) / 1000);
     const initialTimeLeft = Math.max(1, totalDurationSec - elapsedSec);
 
@@ -430,6 +431,14 @@ function App() {
 
     return () => clearInterval(interval);
   }, [currentPartId, loggedTeamId]);
+
+  // Compute live build percentage
+  const liveBuildPercent = useMemo(() => {
+    if (!currentPart || timeLeft <= 0) return 0;
+    const total = Number(currentPart.buildTime || 20);
+    const done = total - timeLeft;
+    return Math.min(100, Math.max(0, Math.round((done / total) * 100)));
+  }, [currentPart, timeLeft]);
 
   // ==========================================
   // AUTH ACTIONS
@@ -552,11 +561,13 @@ function App() {
   async function buyPart(part) {
     if (!loggedTeam) return;
 
+    // 1. Check if another part is already building
     if (currentPartId) {
       showNotice("⏳ يوجد جزء قيد البناء حالياً. انتظر حتى يكتمل.", true);
       return;
     }
 
+    // 2. Check if already purchased
     const alreadyOwned = purchasedParts.some(
       (item) => Number(item.partId) === Number(part.id)
     );
@@ -565,19 +576,32 @@ function App() {
       return;
     }
 
+    // 3. Check for available engineers
     if (Number(loggedTeam.engineers || 0) <= 0) {
-      showNotice("👷 تحتاج إلى شراء مهندس أولاً من قسم المهندسين لبدء البناء!", true);
+      playSound("error");
+      setMissingReqModal({
+        type: "engineer",
+        part,
+        needed: 500,
+      });
       return;
     }
 
+    // 4. Check for sufficient balance
     const price = Number(part.price || 0);
     const balance = Number(loggedTeam.balance || 0);
 
     if (balance < price) {
-      showNotice(`❌ الرصيد غير كافٍ لشراء ${part.name} (السعر: ${price} جنيه).`, true);
+      playSound("error");
+      setMissingReqModal({
+        type: "balance",
+        part,
+        missing: price - balance,
+      });
       return;
     }
 
+    // 5. Start building!
     const purchasedAt = Date.now();
     const newTeamPart = {
       partId: part.id,
@@ -587,7 +611,7 @@ function App() {
       dbId: null,
     };
 
-    // 1. Update local state immediately
+    // Update local state immediately
     setTeamParts((prev) => ({
       ...prev,
       [loggedTeam.id]: [...(prev[loggedTeam.id] || []), newTeamPart],
@@ -598,14 +622,15 @@ function App() {
       [loggedTeam.id]: part.id,
     }));
 
-    setTimeLeft(Math.max(1, Number(part.buildTime || 20) * 60));
+    const durationSec = Math.max(1, Number(part.buildTime || 20));
+    setTimeLeft(durationSec);
 
-    // 2. Update balance
+    // Deduct balance
     await updateTeam(loggedTeam.id, {
       balance: balance - price,
     });
 
-    // 3. Background sync to Supabase
+    // Background sync to Supabase
     try {
       await supabase.from("team_parts").insert({
         team_id: loggedTeam.id,
@@ -619,7 +644,7 @@ function App() {
     }
 
     playSound("buy");
-    showNotice(`🏕️ تم شراء ${part.name} بنجاح! بدأ البناء.`);
+    showNotice(`🏕️ بدأ الآن بناء ${part.name}! (الوقت: ${durationSec} ثانية)`);
     addActivity(`🏕️ بدأ ${loggedTeam.name} بناء "${part.name}".`);
   }
 
@@ -643,6 +668,10 @@ function App() {
       delete next[teamId];
       return next;
     });
+
+    if (loggedTeamId === teamId) {
+      setTimeLeft(0);
+    }
 
     // 3. Update team stats
     const team = teams.find((item) => item.id === teamId);
@@ -671,7 +700,7 @@ function App() {
     }
 
     playSound("complete");
-    showNotice(`🎉 اكتمل بناء ${part.name}! أصبح متاحاً لك بناء جزء جديد.`);
+    showNotice(`🎉 اكتمل بناء ${part.name} بنجاح! نسبة إنجاز الخيمة زادت! 🏕️`);
     addActivity(`🎉 أتم ${team?.name || "فريق"} بناء "${part.name}".`);
   }
 
@@ -894,7 +923,6 @@ function App() {
     const alreadyCompleted = completedList.includes(station.id);
 
     if (alreadyCompleted) {
-      // Remove station
       setTeamStationResults((prev) => ({
         ...prev,
         [teamId]: (prev[teamId] || []).filter((id) => id !== station.id),
@@ -922,7 +950,6 @@ function App() {
       showNotice(`↩️ تم إلغاء محطة "${station.name}" لفريق ${team.name}.`);
       addActivity(`👑 الأدمن ألغى محطة "${station.name}" لـ ${team.name}.`);
     } else {
-      // Add station
       setTeamStationResults((prev) => ({
         ...prev,
         [teamId]: [...(prev[teamId] || []), station.id],
@@ -966,6 +993,14 @@ function App() {
     showNotice(`🔐 تم تغيير الرقم السري لـ ${team.name} بنجاح.`);
   }
 
+  async function adminAddBonusToAll() {
+    const updated = teams.map((t) => ({ ...t, balance: (t.balance || 0) + 1000 }));
+    setTeams(updated);
+    playSound("buy");
+    showNotice("💰 تم إضافة 1000 جنيه لكل الفرق بنجاح!");
+    addActivity("👑 قام الأدمن بإعطاء منحة 1000 جنيه لجميع الفرق.");
+  }
+
   async function adminResetSingleTeam(teamId) {
     const team = teams.find((t) => t.id === teamId);
     if (!team) return;
@@ -980,29 +1015,20 @@ function App() {
     });
 
     await updateTeam(teamId, {
-      balance: 0,
-      engineers: 0,
+      balance: 1000,
+      engineers: 1,
       progress: 0,
       completedParts: 0,
       stations: 0,
     });
 
-    try {
-      await Promise.all([
-        supabase.from("team_parts").delete().eq("team_id", teamId),
-        supabase.from("team_stations").delete().eq("team_id", teamId),
-      ]);
-    } catch (err) {
-      console.warn("Supabase reset team warning:", err);
-    }
-
     playSound("click");
-    showNotice(`🔄 تم تصفير بيانات ${team.name} بالكامل.`);
+    showNotice(`🔄 تم تصفير بيانات ${team.name} وإعطائه 1000 جنيه ومهندس لبدء اللعبة.`);
     addActivity(`👑 قام الأدمن بتصفير بيانات ${team.name}.`);
   }
 
   async function adminResetAllTeams() {
-    if (!window.confirm("⚠️ تحذير: هل أنت متأكد من تصفير بيانات جميع الفرق بالكامل لبدء لعبة جديدة؟")) {
+    if (!window.confirm("⚠️ تحذير: هل أنت متأكد من تصفير بيانات جميع الفرق بالكامل لبدء مسابقة جديدة؟")) {
       return;
     }
 
@@ -1012,8 +1038,8 @@ function App() {
 
     const resetTeamsList = teams.map((team) => ({
       ...team,
-      balance: 0,
-      engineers: 0,
+      balance: 1000,
+      engineers: 1,
       progress: 0,
       completedParts: 0,
       stations: 0,
@@ -1028,8 +1054,8 @@ function App() {
           supabase
             .from("teams")
             .update({
-              balance: 0,
-              engineers: 0,
+              balance: 1000,
+              engineers: 1,
               progress: 0,
               completed_parts: 0,
               stations: 0,
@@ -1042,7 +1068,7 @@ function App() {
     }
 
     playSound("complete");
-    showNotice("🔄 تم تصفير بيانات اللعبة لجميع الفرق بنجاح!");
+    showNotice("🔄 تم تصفير بيانات اللعبة وبدء جولة جديدة لجميع الفرق!");
     addActivity("👑 قام الأدمن بتصفير بيانات اللعبة وبدء جولة جديدة.");
   }
 
@@ -1092,7 +1118,6 @@ function App() {
         setPage("team-dashboard");
         setActiveTeamPage("ranking");
       } else {
-        // Scroll to ranking on home
         setPage("home");
       }
     } else if (target === "rules") {
@@ -1311,7 +1336,7 @@ function App() {
           <section className="dashboard-stats">
             <div className="dashboard-stat">
               <div>💰</div>
-              <span>الرصيد</span>
+              <span>الرصيد المتاح</span>
               <strong>{loggedTeam.balance} جنيه</strong>
             </div>
 
@@ -1334,30 +1359,66 @@ function App() {
             </div>
           </section>
 
+          {/* ACTIVE BUILDING LIVE BANNER */}
+          {currentPart && (
+            <div className="active-build-card">
+              <div className="active-build-header">
+                <div className="active-build-title">
+                  <span className="hammer-icon">🔨</span>
+                  <div>
+                    <span>جاري البناء الآن: </span>
+                    <strong style={{ color: "#ffd875" }}>
+                      {currentPart.icon} {currentPart.name}
+                    </strong>
+                  </div>
+                </div>
+
+                <div className="build-timer-badge">
+                  ⏱️ {formatTime(timeLeft)}
+                </div>
+              </div>
+
+              <div className="build-live-progress-container">
+                <div
+                  className="build-live-progress-bar"
+                  style={{ width: `${liveBuildPercent}%` }}
+                />
+                <div className="build-live-progress-text">
+                  {liveBuildPercent}% مكتمل
+                </div>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
+                <small style={{ color: "#f7d794" }}>
+                  👷 المهندس يعمل على هذا الجزء الآن. بمجرد انتهاء الوقت سيكتمل تلقائياً!
+                </small>
+
+                <button
+                  className="panel-button"
+                  style={{ margin: 0, padding: "4px 10px", fontSize: "11px", background: "#e67e22" }}
+                  onClick={() => completeBuild(loggedTeam.id, currentPart.id)}
+                  title="تسريع الإنهاء للتجربة"
+                >
+                  ⚡ تسريع وإنهاء البناء فوراً
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* MAIN TENT PROGRESS */}
           <section className="building-board">
             <div className="building-header">
-              <h2>🏕️ تقدم بناء خيمة الاجتماع</h2>
-              <strong>{loggedTeam.progress}%</strong>
+              <h2>🏕️ تقدم بناء خيمة الاجتماع الإجمالي</h2>
+              <strong>{loggedTeam.progress}% ({loggedTeam.completedParts}/13 جزء)</strong>
             </div>
 
             <div className="progress-container">
               <div className="progress-bar" style={{ width: `${loggedTeam.progress}%` }} />
             </div>
 
-            {currentPart ? (
-              <div className="current-build-box">
-                <div>
-                  🔨 يتم الآن بناء:
-                  <strong>
-                    {" "}
-                    {currentPart.icon} {currentPart.name}
-                  </strong>
-                </div>
-                <div className="build-timer">⏱️ متبقي: {formatTime(timeLeft)}</div>
-              </div>
-            ) : (
+            {!currentPart && (
               <p>
-                لا يوجد جزء قيد البناء حالياً. ابدأ بإنجاز المحطات لكسب المال، ثم وظّف مهندسين وابنِ الأجزاء!
+                لا يوجد جزء قيد البناء حالياً. ادخل على <strong>أجزاء الخيمة</strong> لبدء بناء جزء جديد!
               </p>
             )}
           </section>
@@ -1414,32 +1475,22 @@ function App() {
                   <div className="subpage-header">
                     <div>
                       <h2>🏕️ متجر أجزاء الخيمة (13 جزء)</h2>
-                      <p>اشترِ أجزاء الخيمة وابدأ البناء فوراً.</p>
+                      <p>اشترِ أجزاء الخيمة وسيبدأ المهندس البناء بالعداد التنازلي.</p>
                     </div>
                     <div className="subpage-balance">💰 رصيدكم: {loggedTeam.balance} جنيه</div>
                   </div>
-
-                  {currentPart && (
-                    <div className="active-build-card">
-                      <span>🔨 قيد البناء الآن</span>
-                      <strong>
-                        {currentPart.icon} {currentPart.name}
-                      </strong>
-                      <div>⏱️ متبقي {formatTime(timeLeft)}</div>
-                    </div>
-                  )}
 
                   <div className="parts-grid">
                     {parts.map((part) => {
                       const owned = purchasedParts.find(
                         (item) => Number(item.partId) === Number(part.id)
                       );
+                      const isBuilding = owned?.status === "building";
+                      const isCompleted = owned?.status === "completed";
 
                       return (
                         <div
-                          className={`part-card ${
-                            owned?.status === "completed" ? "part-completed" : ""
-                          }`}
+                          className={`part-card ${isCompleted ? "part-completed" : ""}`}
                           key={part.id}
                         >
                           <div className="part-icon">{part.icon}</div>
@@ -1447,16 +1498,16 @@ function App() {
                           <h3>{part.name}</h3>
                           <div className="part-details">
                             <span>💰 {part.price} جنيه</span>
-                            <span>⏱️ {part.buildTime} دقيقة</span>
+                            <span>⏱️ {part.buildTime} ثانية</span>
                           </div>
 
-                          {owned?.status === "completed" ? (
+                          {isCompleted ? (
                             <button className="completed-button" disabled>
-                              ✅ مكتمل
+                              ✅ تم بناؤه بنجاح
                             </button>
-                          ) : owned?.status === "building" ? (
+                          ) : isBuilding ? (
                             <button className="building-button" disabled>
-                              🔨 قيد البناء ({formatTime(timeLeft)})
+                              🔨 جاري البناء ({formatTime(timeLeft)})
                             </button>
                           ) : (
                             <button
@@ -1464,7 +1515,7 @@ function App() {
                               onClick={() => buyPart(part)}
                               disabled={Boolean(currentPart)}
                             >
-                              شراء وبدء البناء
+                              {currentPart ? "⏳ يوجد بناء حالي" : "شراء وبدء البناء 🔨"}
                             </button>
                           )}
                         </div>
@@ -1480,7 +1531,7 @@ function App() {
                   <div className="subpage-header">
                     <div>
                       <h2>👷 إدارة المهندسين</h2>
-                      <p>كل جزء يحتاج إلى مهندس واحد أثناء بنائه.</p>
+                      <p>كل جزء يحتاج إلى مهندس متاح للإشراف على بنائه.</p>
                     </div>
                     <div className="subpage-balance">💰 رصيدكم: {loggedTeam.balance} جنيه</div>
                   </div>
@@ -1489,9 +1540,9 @@ function App() {
                     <div className="engineer-big-icon">👷</div>
                     <h2>المهندسين المتاحين حالياً</h2>
                     <strong className="engineer-count">{availableEngineers}</strong>
-                    <p>إجمالي المهندسين لديكم: {loggedTeam.engineers} مهندس</p>
+                    <p>إجمالي المهندسين المسجلين لفريقكم: {loggedTeam.engineers} مهندس</p>
                     <p style={{ marginTop: "6px", color: "#f1d17a" }}>
-                      سعر توظيف المهندس: <strong>500 جنيه</strong>
+                      تكلفة توظيف المهندس: <strong>500 جنيه</strong>
                     </p>
 
                     <button className="buy-engineer-button" onClick={buyEngineer}>
@@ -1513,7 +1564,7 @@ function App() {
                   <div className="subpage-header">
                     <div>
                       <h2>🗺️ محطات المغامرة (7 محطات)</h2>
-                      <p>أكمل المحطات مع القائد واجمع الأموال لبناء الخيمة.</p>
+                      <p>أكمل المحطات مع الخدام واجمع الأموال لبناء الخيمة.</p>
                     </div>
                     <div className="subpage-balance">💰 رصيدكم: {loggedTeam.balance} جنيه</div>
                   </div>
@@ -1524,9 +1575,7 @@ function App() {
 
                       return (
                         <div
-                          className={`station-card ${
-                            completed ? "station-completed" : ""
-                          }`}
+                          className={`station-card ${completed ? "station-completed" : ""}`}
                           key={station.id}
                         >
                           <div className="station-icon">{station.icon}</div>
@@ -1563,9 +1612,7 @@ function App() {
                   <div className="full-ranking">
                     {sortedTeams.map((team, index) => (
                       <div
-                        className={`full-ranking-row ${
-                          team.id === loggedTeam.id ? "my-team" : ""
-                        }`}
+                        className={`full-ranking-row ${team.id === loggedTeam.id ? "my-team" : ""}`}
                         key={team.id}
                       >
                         <div className="rank-position">
@@ -1595,6 +1642,77 @@ function App() {
             </section>
           )}
         </main>
+
+        {/* MISSING REQUIREMENTS MODAL */}
+        {missingReqModal && (
+          <div className="modal-overlay" onClick={() => setMissingReqModal(null)}>
+            <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h2>⚠️ تنبيه قبل الشراء</h2>
+                <button className="modal-close-btn" onClick={() => setMissingReqModal(null)}>✕</button>
+              </div>
+              <div className="modal-body">
+                {missingReqModal.type === "engineer" && (
+                  <div className="missing-req-box">
+                    <h3>👷 لا يوجد مهندس متاح لبناء {missingReqModal.part?.name}!</h3>
+                    <p style={{ marginTop: "8px" }}>
+                      لبدء بناء أي جزء، يجب أن يكون لديكم مهندس متاح للإشراف على البناء.
+                      سعر توظيف المهندس هو <strong>500 جنيه</strong>.
+                    </p>
+                    <div className="missing-req-actions">
+                      {loggedTeam.balance >= 500 ? (
+                        <button
+                          className="panel-button"
+                          style={{ margin: 0, background: "#27ae60" }}
+                          onClick={() => {
+                            buyEngineer();
+                            setMissingReqModal(null);
+                          }}
+                        >
+                          👷 توظيف مهندس الآن (500 جنيه)
+                        </button>
+                      ) : (
+                        <button
+                          className="panel-button"
+                          style={{ margin: 0 }}
+                          onClick={() => {
+                            setMissingReqModal(null);
+                            goTeamPage("stations");
+                          }}
+                        >
+                          🗺️ اذهب للمحطات لكسب المال
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {missingReqModal.type === "balance" && (
+                  <div className="missing-req-box">
+                    <h3>💰 رصيد الفريق غير كافٍ!</h3>
+                    <p style={{ marginTop: "8px" }}>
+                      سعر <strong>{missingReqModal.part?.name}</strong> هو <strong>{missingReqModal.part?.price} جنيه</strong>.
+                      <br />
+                      رصيدكم الحالي: <strong>{loggedTeam.balance} جنيه</strong> (ينقصكم: {missingReqModal.missing} جنيه).
+                    </p>
+                    <div className="missing-req-actions">
+                      <button
+                        className="panel-button"
+                        style={{ margin: 0, background: "#27ae60" }}
+                        onClick={() => {
+                          setMissingReqModal(null);
+                          goTeamPage("stations");
+                        }}
+                      >
+                        🗺️ اذهب للمحطات لكسب الجنيهات
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {notice && <div className="game-notice">{notice}</div>}
       </div>
@@ -1631,12 +1749,21 @@ function App() {
 
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
             <button
+              className="panel-button"
+              style={{ margin: 0, padding: "8px 12px", fontSize: "13px", background: "#27ae60" }}
+              onClick={adminAddBonusToAll}
+            >
+              💰 +1000 لكل الفرق
+            </button>
+
+            <button
               className="panel-button admin-danger-btn"
               style={{ margin: 0, padding: "8px 12px", fontSize: "13px" }}
               onClick={adminResetAllTeams}
             >
               🔄 تصفير كل اللعبة
             </button>
+
             <button className="logout-button" onClick={logoutAdmin}>
               تسجيل الخروج
             </button>
@@ -1956,9 +2083,7 @@ function App() {
 
                   return (
                     <div
-                      className={`part-card ${
-                        status === "completed" ? "part-completed" : ""
-                      }`}
+                      className={`part-card ${status === "completed" ? "part-completed" : ""}`}
                       key={part.id}
                     >
                       <div className="part-icon">{part.icon}</div>
@@ -1966,7 +2091,7 @@ function App() {
                       <h3>{part.name}</h3>
                       <div className="part-details">
                         <span>💰 {part.price} جنيه</span>
-                        <span>⏱️ {part.buildTime} دقيقة</span>
+                        <span>⏱️ {part.buildTime} ثانية</span>
                       </div>
 
                       <div style={{ margin: "8px 0", fontWeight: "bold" }}>
@@ -2021,9 +2146,7 @@ function App() {
 
                   return (
                     <div
-                      className={`station-card ${
-                        completed ? "station-completed" : ""
-                      }`}
+                      className={`station-card ${completed ? "station-completed" : ""}`}
                       key={station.id}
                     >
                       <div className="station-icon">{station.icon}</div>
