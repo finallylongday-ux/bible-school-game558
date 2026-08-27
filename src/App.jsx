@@ -446,7 +446,8 @@ function App() {
           return {
             ...team,
             balance: hasZeroInit ? 1000 : rawBal,
-            engineers: hasZeroInit ? 1 : rawEng,
+            // Always guarantee at least 1 engineer so buying is never blocked
+            engineers: Math.max(1, hasZeroInit ? 1 : rawEng),
             completedParts: compParts,
             stations: stCount,
           };
@@ -655,9 +656,7 @@ function App() {
     if (Number(loggedTeam.engineers || 0) <= 0) {
       showNotice("❌ لا يوجد مهندسون لفريقكم. راجع المشرف لإضافة مهندس.", true); return;
     }
-    if (availableEngineers <= 0) {
-      showNotice(`❌ جميع المهندسين (${loggedTeam.engineers}) مشغولون حالياً. انتظر اكتمال البناء.`, true); return;
-    }
+    // Note: removed strict availableEngineers check — teams can build multiple parts concurrently
 
     const price = Number(part.price || 0);
     const balance = Number(loggedTeam.balance || 0);
