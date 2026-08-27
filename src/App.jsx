@@ -163,52 +163,158 @@ function setLocal(key, value) {
 // ==========================================
 
 function TentDiagram({ completedPartIds, parts }) {
-  const doneSet = useMemo(() => new Set(completedPartIds), [completedPartIds]);
-  const totalDone = doneSet.size;
-  const totalParts = parts.length;
+  const done = useMemo(() => new Set(completedPartIds.map(Number)), [completedPartIds]);
+  const is = (id) => done.has(id);
+  const builtCount = done.size;
+  const pct = Math.round((builtCount / 13) * 100);
 
   return (
-    <div className="tent-diagram-wrap">
-      <div className="tent-diagram-title">
-        <span>🏕️ خيمة الاجتماع</span>
-        <span className="tent-progress-badge">{totalDone}/{totalParts} جزء مكتمل</span>
+    <div className="t3d-wrap">
+      {/* Header */}
+      <div className="t3d-header-bar">
+        <div className="t3d-h-title">🏛️ خيمة الاجتماع المقدسة</div>
+        <div className={`t3d-h-badge ${pct === 100 ? "t3d-badge-complete" : ""}`}>
+          {builtCount}/13 جزء — {pct}%
+        </div>
       </div>
 
-      <div className="tent-diagram">
-        {TENT_SECTIONS.map((section) => (
+      {/* Direction labels */}
+      <div className="t3d-dir-row">
+        <span className="t3d-dir t3d-dir-west">⟵ غرب · قدس الأقداس</span>
+        <span className="t3d-dir t3d-dir-east">شرق · المدخل ⟶</span>
+      </div>
+
+      {/* Main court visual */}
+      <div className="t3d-court-outer">
+
+        {/* FENCE label */}
+        <div className={`t3d-fence-tag ${is(1) ? "fence-built" : "fence-empty"}`}>
+          {is(1) ? "🪵 سور الخيمة ✅" : "⬜ سور الخيمة"}
+        </div>
+
+        <div className="t3d-court-inner">
+
+          {/* ── HOLY OF HOLIES ── */}
+          <div className={`t3d-col t3d-hoh-col ${is(10) ? "hoh-built" : "hoh-empty"}`}>
+            <div className="t3d-col-title hoh-title">
+              {is(10) ? "✨" : "⬜"}<br />قدس<br />الأقداس
+            </div>
+            {/* ARK */}
+            <div className={`t3d-ark-box ${is(11) ? "ark-built" : "ark-empty"}`}>
+              <div className={`t3d-ark-inner ${is(11) ? "ark-glow" : ""}`}>
+                <span className="t3d-ark-emoji">📦</span>
+                {is(11) && <div className="t3d-ark-rays" />}
+              </div>
+              <div className="t3d-ark-label">تابوت العهد</div>
+            </div>
+          </div>
+
+          {/* ── VEIL ── */}
+          <div className="t3d-veil-col">
+            <div className="t3d-veil-bar" />
+            <div className="t3d-veil-label">الحجاب</div>
+          </div>
+
+          {/* ── HOLY PLACE ── */}
+          <div className={`t3d-col t3d-hp-col ${is(6) ? "hp-built" : "hp-empty"}`}>
+            <div className="t3d-col-title hp-title">
+              {is(6) ? "🏛️" : "⬜"} القدس
+            </div>
+
+            {/* Coverings & Materials badges */}
+            <div className="t3d-tent-badges">
+              <span className={`t3d-tbadge ${is(5) ? "tbadge-on" : "tbadge-off"}`}>
+                🧵 {is(5) ? "✅" : "⬜"}
+              </span>
+              <span className={`t3d-tbadge ${is(13) ? "tbadge-on" : "tbadge-off"}`}>
+                🧰 {is(13) ? "✅" : "⬜"}
+              </span>
+            </div>
+
+            {/* Three furnishings */}
+            <div className="t3d-hp-items">
+              <div className={`t3d-furn ${is(9) ? "furn-built" : "furn-empty"}`}>
+                <span className="t3d-furn-em">🍞</span>
+                <span className="t3d-furn-lbl">مائدة خبز الوجوه</span>
+              </div>
+              <div className={`t3d-furn t3d-furn-center ${is(7) ? "furn-built furn-menorah" : "furn-empty"}`}>
+                <span className="t3d-furn-em">🕎</span>
+                <span className="t3d-furn-lbl">المنارة الذهبية</span>
+                {is(7) && <div className="t3d-menorah-glow" />}
+              </div>
+              <div className={`t3d-furn ${is(8) ? "furn-built" : "furn-empty"}`}>
+                <span className="t3d-furn-em">🪔</span>
+                <span className="t3d-furn-lbl">مذبح البخور</span>
+              </div>
+            </div>
+          </div>
+
+          {/* ── OPEN COURT ── */}
+          <div className="t3d-col t3d-oc-col">
+            <div className="t3d-col-title oc-title">الفناء الخارجي</div>
+            <div className="t3d-oc-items">
+              {/* BRONZE ALTAR */}
+              <div className={`t3d-stand ${is(4) ? "stand-altar" : "stand-empty"}`}>
+                <div className="t3d-stand-body">
+                  <span className="t3d-stand-em">🔥</span>
+                  {is(4) && <div className="t3d-altar-flames" />}
+                </div>
+                <div className="t3d-stand-foot" />
+                <div className="t3d-stand-lbl">مذبح المحرقة</div>
+              </div>
+              {/* LAVER */}
+              <div className={`t3d-stand ${is(3) ? "stand-laver" : "stand-empty"}`}>
+                <div className="t3d-stand-body t3d-stand-round">
+                  <span className="t3d-stand-em">🪣</span>
+                  {is(3) && <div className="t3d-water-ripple" />}
+                </div>
+                <div className="t3d-stand-foot" />
+                <div className="t3d-stand-lbl">مرحضة</div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── GATE ── */}
+          <div className={`t3d-gate-col ${is(2) ? "gate-built" : "gate-empty"}`}>
+            <div className="t3d-gate-top-bar" />
+            <div className="t3d-gate-icon">🚪</div>
+            <div className="t3d-gate-lbl">باب<br />الخيمة</div>
+            <div className="t3d-gate-bottom-bar" />
+            {is(2) && <div className="t3d-gate-glow-strip" />}
+          </div>
+
+        </div>{/* t3d-court-inner */}
+      </div>{/* t3d-court-outer */}
+
+      {/* HIGH PRIEST GARMENTS — outside the court */}
+      <div className={`t3d-priest-row ${is(12) ? "priest-built" : "priest-empty"}`}>
+        <span className="t3d-priest-em">👑</span>
+        <div className="t3d-priest-txt">
+          <div className="t3d-priest-name">لباس رئيس الكهنة</div>
+          <div className="t3d-priest-sub">High Priest&apos;s Garments</div>
+        </div>
+        <div className={`t3d-priest-status ${is(12) ? "ps-done" : "ps-todo"}`}>
+          {is(12) ? "✅ مكتمل" : "⬜ لم يُبنَ بعد"}
+        </div>
+      </div>
+
+      {/* Parts strip */}
+      <div className="t3d-parts-strip">
+        {parts.map((p) => (
           <div
-            key={section.id}
-            className="tent-section"
-            style={{ borderColor: section.color, background: section.bg }}
+            key={p.id}
+            className={`t3d-pip ${done.has(p.id) ? "pip-done" : "pip-todo"}`}
+            title={p.name}
           >
-            <div className="tent-section-label" style={{ color: section.color }}>
-              <span>{section.label}</span>
-              <small>{section.labelSub}</small>
-            </div>
-            <div className="tent-section-parts">
-              {section.partIds.map((pid) => {
-                const part = parts.find((p) => p.id === pid);
-                const done = doneSet.has(pid);
-                return (
-                  <div
-                    key={pid}
-                    className={`tent-part-slot ${done ? "tent-part-done" : "tent-part-pending"}`}
-                    title={part?.name}
-                  >
-                    <span className="tent-slot-icon">{part?.icon || "⬜"}</span>
-                    <span className="tent-slot-name">{part?.name}</span>
-                    {done && <span className="tent-slot-check">✅</span>}
-                  </div>
-                );
-              })}
-            </div>
+            <span>{done.has(p.id) ? p.icon : "▪"}</span>
+            {done.has(p.id) && <span className="pip-tick">✓</span>}
           </div>
         ))}
       </div>
 
-      {totalDone === totalParts && (
-        <div className="tent-complete-banner">
-          🎉 اكتملت خيمة الاجتماع! تمجيد لله! 🎉
+      {pct === 100 && (
+        <div className="t3d-complete-banner">
+          🎉 اكتملت خيمة الاجتماع كاملةً! المجد لله! 🎉
         </div>
       )}
     </div>
@@ -1169,24 +1275,83 @@ function App() {
                   <div className="subpage-header">
                     <div>
                       <h2>🏆 لوحة الترتيب العام</h2>
-                      <p>تابعوا تقدمكم مقارنة بباقي الفرق المتنافسة.</p>
+                      <p>ترتيب الفرق بناءً على نسبة البناء والمحطات والرصيد.</p>
                     </div>
                   </div>
-                  <div className="full-ranking">
-                    {sortedTeams.map((team, index) => (
-                      <div className={`full-ranking-row ${team.id === loggedTeam.id ? "my-team" : ""}`} key={team.id}>
-                        <div className="rank-position">
-                          {index === 0 ? "🥇 الأول" : index === 1 ? "🥈 الثاني" : index === 2 ? "🥉 الثالث" : "🏅 الرابع"}
+
+                  <div className="rnk-list">
+                    {sortedTeams.map((team, index) => {
+                      const medals = ["🥇", "🥈", "🥉", "🏅"];
+                      const rankColors = ["#d4af37", "#a8a9ad", "#cd7f32", "#7a6030"];
+                      const rankBg = [
+                        "linear-gradient(135deg,#2a1f00,#3d2d00)",
+                        "linear-gradient(135deg,#1a1a1a,#2c2c2c)",
+                        "linear-gradient(135deg,#1e0e00,#321800)",
+                        "linear-gradient(135deg,#0d0d0d,#1e1e1e)",
+                      ];
+                      const isMe = team.id === loggedTeam.id;
+                      const tpList = teamParts[team.id] || [];
+                      const donePids = new Set(tpList.filter(p => p.status === "completed").map(p => Number(p.partId)));
+
+                      return (
+                        <div
+                          key={team.id}
+                          className={`rnk-card ${isMe ? "rnk-card-me" : ""}`}
+                          style={{ background: rankBg[index] || rankBg[3], borderColor: rankColors[index] || rankColors[3] }}
+                        >
+                          {/* MEDAL */}
+                          <div className="rnk-medal" style={{ color: rankColors[index] || rankColors[3] }}>
+                            <div className="rnk-medal-icon">{medals[index] || "🏅"}</div>
+                            <div className="rnk-medal-num">#{index + 1}</div>
+                          </div>
+
+                          {/* MAIN INFO */}
+                          <div className="rnk-main">
+                            <div className="rnk-name-row">
+                              <span className="rnk-name">{team.name}</span>
+                              {isMe && <span className="rnk-you-badge">🎯 فريقكم</span>}
+                            </div>
+
+                            {/* Progress bar */}
+                            <div className="rnk-prog-wrap">
+                              <div className="rnk-prog-bar">
+                                <div
+                                  className="rnk-prog-fill"
+                                  style={{
+                                    width: `${team.progress}%`,
+                                    background: `linear-gradient(90deg, ${rankColors[index] || rankColors[3]}99, ${rankColors[index] || rankColors[3]})`,
+                                  }}
+                                />
+                              </div>
+                              <span className="rnk-prog-pct" style={{ color: rankColors[index] || rankColors[3] }}>
+                                {team.progress}%
+                              </span>
+                            </div>
+
+                            {/* Stats pills */}
+                            <div className="rnk-pills">
+                              <span className="rnk-pill">💰 {team.balance.toLocaleString("ar-EG")} جنيه</span>
+                              <span className="rnk-pill">🗺️ {team.stations}/8 محطات</span>
+                              <span className="rnk-pill">🏛️ {team.completedParts}/13 جزء</span>
+                              <span className="rnk-pill">👷 {team.engineers} مهندس</span>
+                            </div>
+
+                            {/* Mini parts icons */}
+                            <div className="rnk-parts-row">
+                              {parts.map((p) => (
+                                <span
+                                  key={p.id}
+                                  className={`rnk-part-icon ${donePids.has(p.id) ? "rpi-done" : "rpi-empty"}`}
+                                  title={p.name}
+                                >
+                                  {donePids.has(p.id) ? p.icon : "▪"}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
                         </div>
-                        <div className="rank-team-name">
-                          {team.name}{team.id === loggedTeam.id && <small> (فريقكم)</small>}
-                        </div>
-                        <div>🏕️ البناء: {team.progress}%</div>
-                        <div>🧱 الأجزاء: {team.completedParts}/13</div>
-                        <div>🗺️ المحطات: {team.stations}/8</div>
-                        <div>💰 {team.balance} جنيه</div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </>
               )}
