@@ -7,10 +7,10 @@ import "./App.css";
 // ==========================================
 
 const INITIAL_TEAMS = [
-  { id: 1, name: "فريق 1", pin: "1111", balance: 1000, engineers: 1, progress: 0, completedParts: 0, stations: 0 },
-  { id: 2, name: "فريق 2", pin: "2222", balance: 1000, engineers: 1, progress: 0, completedParts: 0, stations: 0 },
-  { id: 3, name: "فريق 3", pin: "3333", balance: 1000, engineers: 1, progress: 0, completedParts: 0, stations: 0 },
-  { id: 4, name: "فريق 4", pin: "4444", balance: 1000, engineers: 1, progress: 0, completedParts: 0, stations: 0 },
+  { id: 1, name: "مسطرة",            pin: "1111", balance: 1000, engineers: 1, progress: 0, completedParts: 0, stations: 0 },
+  { id: 2, name: "طوبة",             pin: "2222", balance: 1000, engineers: 1, progress: 0, completedParts: 0, stations: 0 },
+  { id: 3, name: "المقاولون العرب",  pin: "3333", balance: 1000, engineers: 1, progress: 0, completedParts: 0, stations: 0 },
+  { id: 4, name: "خرسانة",           pin: "4444", balance: 1000, engineers: 1, progress: 0, completedParts: 0, stations: 0 },
 ];
 
 // buildTime is in MINUTES
@@ -903,6 +903,20 @@ function App() {
     addActivity("👑 قام الأدمن بإعطاء منحة 1000 جنيه لجميع الفرق.");
   }
 
+  async function adminApplyDefaultNames() {
+    const defaultNames = { 1: "مسطرة", 2: "طوبة", 3: "المقاولون العرب", 4: "خرسانة" };
+    const updated = teams.map((t) => ({ ...t, name: defaultNames[t.id] || t.name }));
+    setTeams(updated);
+    try {
+      await Promise.all(
+        updated.map((t) => supabase.from("teams").update({ name: t.name }).eq("id", t.id))
+      );
+    } catch (err) { console.warn("Supabase name sync warning:", err); }
+    playSound("buy");
+    showNotice("✅ تم تطبيق أسماء الفرق: مسطرة، طوبة، المقاولون العرب، خرسانة");
+    addActivity("👑 الأدمن عدّل أسماء الفرق إلى الأسماء الرسمية.");
+  }
+
   async function adminResetSingleTeam(teamId) {
     const team = teams.find((t) => t.id === teamId);
     if (!team) return;
@@ -1383,7 +1397,21 @@ function App() {
             <div className="admin-small-title">BIBLE SCHOOL ADVENTURE</div>
             <h1>👑 لوحة تحكم الأدمن والمشرفين</h1>
           </div>
-          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+            <button
+              className="panel-button"
+              style={{ margin: 0, padding: "8px 12px", fontSize: "13px", background: "#1565c0" }}
+              onClick={() => { setPage("team-login"); }}
+            >
+              👥 انتقل لصفحة الفرق
+            </button>
+            <button
+              className="panel-button"
+              style={{ margin: 0, padding: "8px 12px", fontSize: "13px", background: "#6a1b9a" }}
+              onClick={adminApplyDefaultNames}
+            >
+              ✏️ تطبيق أسماء الفرق
+            </button>
             <button className="panel-button" style={{ margin: 0, padding: "8px 12px", fontSize: "13px", background: "#27ae60" }} onClick={adminAddBonusToAll}>
               💰 +1000 لكل الفرق
             </button>
